@@ -1,4 +1,8 @@
 import { MEDIA_ERROR_CODES, MediaError, normalizeMediaError } from '../core/MediaErrors.js'
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
+import { resolveProviderModelConfig } from '../../../src/utils/speechModelResolver.js'
 
 function publicError(error) {
   return (error instanceof MediaError ? error : normalizeMediaError(error)).toPublicResult()
@@ -117,6 +121,53 @@ export function registerMediaIpcHandlers(ipcMain, mediaModule) {
     requireId(providerId, 'providerId'),
     requireObject(config, 'config'),
   ))
+  handle('media:fetchSpeechModels', async (providerId, config = {}) => mediaModule.speechToText.listModels(
+    requireId(providerId, 'providerId'),
+    requireObject(config, 'config'),
+  ))
+  // 语音输入（麦克风短音频）转录：必须走主进程，避免渲染进程直连百炼/OpenAI 兼容接口触发 CORS，
+  // 同时复用各 provider 的正确协议（百炼 async/qwen-flash/fun-asr-flash/realtime）。
+  handle('media:transcribeAudio', async (arrayBuffer, options = {}) => {
+    const data = arrayBuffer && arrayBuffer.byteLength != null ? arrayBuffer : null
+    if (!data || !data.byteLength) {
+      throw new MediaError(MEDIA_ERROR_CODES.INVALID_ARGUMENT, '语音音频数据为空。', { stage: 'stt' })
+    }
+    const settings = mediaModule.dependencies?.database?.getSetting?.('mediaSpeechSettings') || {}
+    const ref = String(options?.ref || settings?.defaultModelRef || '')
+    const idx = ref.indexOf('::')
+    const providerId = idx > 0 ? ref.slice(0, idx) : ref
+    const providers = settings?.providers && typeof settings.providers === 'object' ? settings.providers : {}
+    const provider = providers[providerId]
+    if (!provider?.enabled) {
+      throw new MediaError(MEDIA_ERROR_CODES.STT_NOT_CONFIGURED, '所选语音识别服务未启用，请在设置中启用。', { stage: 'stt', provider: providerId })
+    }
+    const config = resolveProviderModelConfig(provider, ref, providerId)
+    const providerImpl = mediaModule.speechToText?.get(providerId)
+    if (!providerImpl) {
+      throw new MediaError(MEDIA_ERROR_CODES.STT_PROVIDER_UNAVAILABLE, '未找到语音转文字服务商。', { stage: 'stt', provider: providerId })
+    }
+    const audioFormat = String(options?.audioFormat || 'wav').toLowerCase() || 'wav'
+    const tmpPath = path.join(os.tmpdir(), `voice-input-${Date.now()}.${audioFormat}`)
+    await fs.promises.writeFile(tmpPath, Buffer.from(data))
+    try {
+      const result = await providerImpl.transcribe({
+        mode: 'local_file',
+        localPath: tmpPath,
+        language: String(options?.language || config.language || 'auto'),
+        sizeBytes: data.byteLength,
+        durationMs: 0,
+      }, config, {})
+      return {
+        success: true,
+        text: String(result?.text || ''),
+        segments: Array.isArray(result?.segments) ? result.segments : [],
+        model: result?.model || config.model || '',
+        language: result?.language || '',
+      }
+    } finally {
+      fs.promises.unlink(tmpPath).catch(() => {})
+    }
+  })
   handle('media:getBilibiliCookieStatus', async () => ({
     success: true,
     status: mediaModule.bilibili.cookies.getStatus(),

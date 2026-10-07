@@ -32,7 +32,8 @@ function endpoint(config = '') {
 }
 
 function hostFor(config = {}) {
-  if (config.baseUrl) return endpoint(config.baseUrl)
+  const baseUrl = String(config.baseUrl ?? '').trim()
+  if (baseUrl && baseUrl !== 'undefined') return endpoint(baseUrl)
   const workspace = String(config.workspaceId || '').trim()
   const region = String(config.region || 'cn-beijing').trim()
   if (!workspace) return `https://dashscope.aliyuncs.com/api/v1`
@@ -151,7 +152,8 @@ export class AliyunBailianAsrProvider {
 
   async checkConfiguration(config = {}) {
     if (!String(config.apiKey || '').trim()) throw new MediaError(MEDIA_ERROR_CODES.STT_NOT_CONFIGURED, '阿里云百炼缺少 API Key。', { provider: this.id, stage: 'stt' })
-    if (!String(config.workspaceId || '').trim() && !String(config.baseUrl || '').trim()) {
+    const cfgBaseUrl = String(config.baseUrl || '').trim()
+    if (!String(config.workspaceId || '').trim() && (!cfgBaseUrl || cfgBaseUrl === 'undefined')) {
       throw new MediaError(MEDIA_ERROR_CODES.STT_NOT_CONFIGURED, '阿里云百炼缺少 Workspace ID。', { provider: this.id, stage: 'stt' })
     }
     const model = String(config.model || '').trim()
@@ -189,13 +191,17 @@ export class AliyunBailianAsrProvider {
     const base = hostFor(config)
     const model = config.model || 'fun-asr'
     const qwenFileTrans = /^qwen3-asr-flash-filetrans/i.test(model)
+    // language_hints 仅适用于 paraformer-v2；fun-asr 走自动语种检测，不能传该字段（官方文档明确限制）。
+    const isParaformerV2 = /^paraformer-v2/i.test(model)
     const warnings = [...inputWarnings]
     if (qwenFileTrans && config.enableDiarization) warnings.push('Qwen3-ASR Filetrans 不支持说话人分离，已忽略该选项。')
     const parameters = {
       channel_id: [0],
-      ...(language && language !== 'auto' ? (qwenFileTrans ? { language } : { language_hints: [language] }) : {}),
+      ...(language && language !== 'auto' ? (qwenFileTrans ? { language } : isParaformerV2 ? { language_hints: [language] } : {}) : {}),
       ...(config.enableDiarization && !qwenFileTrans ? { diarization_enabled: true } : {}),
       ...(qwenFileTrans ? { enable_words: true } : {}),
+      // 用户在模型卡片“额外参数”里配置的覆盖项（如 vocabulary_id、output_format 等）
+      ...(config.customParams || {}),
     }
     let response
     try {
@@ -247,7 +253,7 @@ export class AliyunBailianAsrProvider {
         body: JSON.stringify({
           model,
           input: { messages: [{ role: 'user', content: [{ type: 'input_audio', input_audio: { data } }] }] },
-          parameters: { format: format || 'wav', sample_rate: '16000' },
+          parameters: { format: format || 'wav', sample_rate: '16000', ...(config.customParams || {}) },
         }),
         signal: context.signal,
       })
@@ -294,6 +300,7 @@ export class AliyunBailianAsrProvider {
           asr_options: {
             ...(language && language !== 'auto' ? { language } : {}),
             enable_itn: false,
+            ...(config.customParams || {}),
           },
         }),
         signal: context.signal,

@@ -8,7 +8,11 @@ import TextEditContextMenu from '@/components/TextEditContextMenu.vue'
 import { useAgentsStore } from '@/stores/agents'
 import { useSettingsStore } from '@/stores/settings'
 import { useQuickInputsStore } from '@/stores/quickInputs'
+import { useMediaStore } from '@/stores/media'
+import { useVoiceInput } from '@/composables/useVoiceInput'
+import { useRouter } from 'vue-router'
 import { displayTextFromDocument, isStructuredInputDocument, normalizeInputDocument, resolvedTextFromDocument } from '@/utils/chatInputDocument'
+import { getAliyunAsrModelTypeLabel } from '@/constants/aliyunAsrModels'
 import {
   canCreateAttachmentFromFile,
   collectFilesFromDataTransfer,
@@ -62,6 +66,31 @@ const msg = useMessage()
 const agentsStore = useAgentsStore()
 const settingsStore = useSettingsStore()
 const quickInputsStore = useQuickInputsStore()
+const mediaStore = useMediaStore()
+const router = useRouter()
+const voiceBtnRef = ref(null)
+const showVoiceModelDropdown = ref(false)
+const voiceModelPos = ref({ left: 0, bottom: 0, arrowLeft: 18 })
+const voiceStreamRef = ref(null)
+const {
+  status: voiceStatus,
+  errorMsg: voiceErrorMsg,
+  duration: voiceDuration,
+  audioLevel: voiceAudioLevel,
+  partialText: voicePartialText,
+  selectedModelRef: voiceSelectedModelRef,
+  availableModels: voiceAvailableModels,
+  hasModels: voiceHasModels,
+  selectedModel: voiceSelectedModel,
+  isStreamingModel: voiceIsStreaming,
+  isRealtimeModel: voiceIsRealtime,
+  start: voiceStart,
+  stop: voiceStop,
+  cancel: voiceCancel,
+  selectModel: voiceSelectModel,
+  resetError: voiceResetError,
+  formatDuration: voiceFormatDuration,
+} = useVoiceInput()
 
 const totalTokens = computed(() => props.totalInputTokens + props.totalOutputTokens)
 const inputText = computed(() => displayTextFromDocument(inputDocument.value))
@@ -81,6 +110,14 @@ const wikiButtonLabel = computed(() => {
 })
 
 const canSend = computed(() => inputText.value.trim() && !props.isStreaming && charCount.value <= MAX_INPUT_LENGTH)
+
+// Toolbar visibility from settings (Agent selector and Clear button are always visible)
+const showAttach = computed(() => settingsStore.chatToolbarAttach !== false)
+const showWiki = computed(() => settingsStore.chatToolbarWiki !== false)
+const showContext = computed(() => settingsStore.chatToolbarContext !== false)
+const showVoice = computed(() => settingsStore.chatToolbarVoice !== false)
+const showTokenCounter = computed(() => settingsStore.chatToolbarTokenCounter !== false)
+const showLatency = computed(() => settingsStore.chatToolbarLatency !== false)
 
 const agentSkills = computed(() => {
   if (!props.selectedAgent?.skills?.length) return []
@@ -132,6 +169,106 @@ function formatTokenCount(n) {
 
 function skillDescription(skill) {
   return skill?.desc || skill?.description || skill?.category || ''
+}
+
+
+
+// ─── Voice input ───
+const voiceTitle = computed(() => {
+  if (voiceStatus.value === 'recording') return '点击停止录音'
+  if (voiceStatus.value === 'transcribing') return '语音识别中…'
+  if (voiceStatus.value === 'error') return voiceErrorMsg.value || '语音输入出错，点击重试'
+  const model = voiceSelectedModel.value
+  return model ? `语音输入（${model.modelName || model.modelId}）` : '语音输入'
+})
+
+const voiceButtonClass = computed(() => {
+  if (voiceStatus.value === 'recording') {
+    return props.isDark ? 'voice-mic-active text-rose-400 bg-rose-400/10' : 'voice-mic-active text-rose-500 bg-rose-50'
+  }
+  if (voiceStatus.value === 'transcribing') {
+    return props.isDark ? 'text-amber-400 bg-amber-400/10' : 'text-amber-500 bg-amber-50'
+  }
+  if (showVoiceModelDropdown.value) {
+    return props.isDark ? 'text-brand-400 bg-brand-400/10' : 'text-brand-500 bg-brand-50'
+  }
+  return props.isDark ? 'text-wt-aux hover:text-wt-sub hover:bg-white/5' : 'text-lt-aux hover:text-lt-sub hover:bg-l4'
+})
+
+const voiceShowStreamingText = computed(() =>
+  voicePartialText.value && (
+    voiceStatus.value === 'transcribing' ||
+    (voiceStatus.value === 'recording' && (voiceIsRealtime.value))
+  )
+)
+
+const voiceLevelBars = computed(() => {
+  const level = voiceAudioLevel.value
+  return [
+    Math.max(0.12, level * 0.4),
+    Math.max(0.18, level * 0.65),
+    Math.max(0.22, level * 0.95),
+    Math.max(0.18, level * 0.75),
+    Math.max(0.12, level * 0.5),
+  ]
+})
+
+watch(() => voicePartialText.value, () => {
+  nextTick(() => {
+    const el = voiceStreamRef.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
+})
+
+async function handleVoiceClick() {
+  if (voiceStatus.value === 'idle' || voiceStatus.value === 'error') {
+    voiceResetError()
+    const ok = await voiceStart()
+    if (!ok && voiceErrorMsg.value) {
+      msg.error(voiceErrorMsg.value, { duration: 3500 })
+    }
+  } else if (voiceStatus.value === 'recording') {
+    const text = await voiceStop()
+    if (text) {
+      const el = tokenEditorRef.value?.getElement?.()
+      if (el) {
+        el.focus()
+        const range = document.createRange()
+        range.selectNodeContents(el)
+        range.collapse(false)
+        const sel = window.getSelection()
+        sel.removeAllRanges()
+        sel.addRange(range)
+        const currentText = el.textContent || ''
+        const prefix = currentText && !/\s$/.test(currentText) ? ' ' : ''
+        tokenEditorRef.value?.insertText?.(prefix + text)
+      } else {
+        tokenEditorRef.value?.insertText?.(text)
+      }
+    } else if (voiceErrorMsg.value) {
+      msg.error(voiceErrorMsg.value, { duration: 3500 })
+    }
+  }
+}
+
+function toggleVoiceModelDropdown() {
+  if (showVoiceModelDropdown.value) {
+    showVoiceModelDropdown.value = false
+    return
+  }
+  activePopover.value = null
+  showVoiceModelDropdown.value = true
+  voiceModelPos.value = calcPopoverPos(voiceBtnRef.value)
+}
+
+function selectVoiceModel(ref) {
+  voiceSelectModel(ref)
+  showVoiceModelDropdown.value = false
+}
+
+function goToSpeechSettings() {
+  showVoiceModelDropdown.value = false
+  router.push('/settings/speech-models')
 }
 
 function calcPopoverPos(btnRef) {
@@ -203,7 +340,10 @@ watch(() => props.commandInsertRequest?.id, () => {
 
 watch(() => settingsStore.workDirRoot, () => quickInputsStore.load().catch(() => {}))
 
-onMounted(() => quickInputsStore.load().catch(() => {}))
+onMounted(() => {
+  quickInputsStore.load().catch(() => {})
+  mediaStore.loadSpeechSettings().catch(() => {})
+})
 
 // Clipboard files/images become local attachment context items; plain text paste keeps default behavior.
 async function handlePaste(e) {
@@ -217,18 +357,23 @@ async function handlePaste(e) {
 
 // Click outside to close popover
 function onDocClick(e) {
-  if (!activePopover.value) return
+  if (!activePopover.value && !showVoiceModelDropdown.value) return
   const popoverEl = document.getElementById('chat-popover-content')
+  const voiceModelEl = document.getElementById('voice-model-dropdown')
   const attachBtn = attachBtnRef.value
   const agentBtn = agentBtnRef.value
   const wikiBtn = wikiBtnRef.value
   const ctxBtn = ctxBtnRef.value
   if (popoverEl && popoverEl.contains(e.target)) return
+  if (voiceModelEl && voiceModelEl.contains(e.target)) return
   if (attachBtn && attachBtn.contains(e.target)) return
   if (agentBtn && agentBtn.contains(e.target)) return
   if (wikiBtn && wikiBtn.contains(e.target)) return
   if (ctxBtn && ctxBtn.contains(e.target)) return
+  const voiceBtn = voiceBtnRef.value
+  if (voiceBtn && voiceBtn.contains(e.target)) return
   activePopover.value = null
+  showVoiceModelDropdown.value = false
 }
 document.addEventListener('click', onDocClick, true)
 onBeforeUnmount(() => document.removeEventListener('click', onDocClick, true))
@@ -268,11 +413,84 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick, true))
 
         <!-- 右下角字数统计 -->
         <div
+          v-show="voiceStatus === 'idle'"
           class="absolute right-4 bottom-2.5 text-[12px] tabular-nums select-none pointer-events-none transition-colors"
           :class="
             charCount > MAX_INPUT_LENGTH ? 'text-red-500 font-600' : isDark ? 'text-wt-dim/120' : 'text-lt-aux/60'
           ">
           {{ charCount }} / {{ MAX_INPUT_LENGTH }}
+        </div>
+
+        <!-- Voice status overlay (absolute, no height impact) -->
+        <div
+          v-if="voiceStatus !== 'idle'"
+          class="voice-status-overlay absolute inset-x-1 sm:inset-x-4 bottom-1 z-20 rounded-lg pointer-events-auto"
+          :class="[
+            voiceStatus === 'recording' ? (isDark ? 'voice-bg-rec-dark' : 'voice-bg-rec-light') : '',
+            voiceStatus === 'transcribing' ? (isDark ? 'voice-bg-load-dark' : 'voice-bg-load-light') : '',
+            voiceStatus === 'error' ? (isDark ? 'voice-bg-err-dark' : 'voice-bg-err-light') : ''
+          ]">
+          <!-- Recording with waveform -->
+          <div v-if="voiceStatus === 'recording' && !voiceShowStreamingText"
+               class="voice-rec-row flex items-center justify-center gap-2.5 py-0.5">
+            <span class="voice-rec-dot shrink-0" style="width:6px;height:6px" />
+            <span class="text-[12px] font-medium" :class="isDark ? 'text-red-400' : 'text-red-500'">录音中</span>
+            <div class="voice-waveform flex items-center gap-[2px] h-[20px]">
+              <span v-for="(bar, i) in voiceLevelBars" :key="i"
+                    class="voice-wave-bar rounded-full"
+                    :class="isDark ? 'bg-red-400' : 'bg-red-500'"
+                    :style="{ height: Math.round(bar * 18 + 2) + 'px', opacity: 0.35 + bar * 0.65 }" />
+            </div>
+            <span class="text-[12px] tabular-nums" :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">{{ voiceFormatDuration() }}</span>
+            <button @click.stop="voiceCancel"
+                    class="voice-cancel-btn text-[11px] px-1.5 py-0.5 rounded-md transition-colors"
+                    :class="isDark ? 'text-wt-dim hover:text-red-400 hover:bg-red-400/10' : 'text-lt-aux hover:text-red-500 hover:bg-red-50'">
+              取消
+            </button>
+          </div>
+          <!-- Streaming text card -->
+          <div
+            v-else-if="voiceShowStreamingText"
+            ref="voiceStreamRef"
+            class="voice-stream-card max-h-[120px] overflow-y-auto py-2 px-1"
+            :class="voiceIsRealtime ? (isDark ? 'voice-card-realtime-dark' : 'voice-card-realtime-light') : (isDark ? 'voice-card-dark' : 'voice-card-light')">
+            <div v-if="voiceStatus === 'recording'" class="flex items-center gap-1.5 mb-1.5">
+              <span class="voice-rec-dot shrink-0" style="width:6px;height:6px" />
+              <span class="text-[11px] font-medium" :class="isDark ? 'text-amber-400' : 'text-amber-600'">实时识别</span>
+              <div class="voice-waveform voice-waveform-sm flex items-center gap-[1.5px] h-[12px]">
+                <span v-for="(bar, i) in voiceLevelBars" :key="i"
+                      class="voice-wave-bar rounded-full"
+                      :class="isDark ? 'bg-amber-400' : 'bg-amber-500'"
+                      :style="{ height: Math.round(bar * 10 + 2) + 'px', opacity: 0.35 + bar * 0.65 }" />
+              </div>
+              <span class="text-[11px] tabular-nums" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">{{ voiceFormatDuration() }}</span>
+            </div>
+            <p class="text-[14px] leading-relaxed m-0" :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">
+              {{ voicePartialText }}<span class="voice-cursor" :class="isDark ? 'bg-brand-400' : 'bg-brand-500'" />
+            </p>
+          </div>
+          <!-- Loading -->
+          <div v-else-if="voiceStatus === 'transcribing'" class="flex items-center justify-center gap-2 py-0.5">
+            <i class="ri-loader-4-line text-[14px]" :class="isDark ? 'text-brand-400' : 'text-brand-500'" style="animation: spin 1s linear infinite" />
+            <span class="text-[12px]" :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">语音识别中</span>
+            <span class="voice-dots" />
+          </div>
+          <!-- Error -->
+          <div v-else-if="voiceStatus === 'error'" class="flex items-center justify-center gap-2 py-0.5">
+            <i class="ri-error-warning-line text-[14px]" :class="isDark ? 'text-red-400' : 'text-red-500'" />
+            <span class="text-[12px] flex-1 min-w-0 truncate" :class="isDark ? 'text-red-400' : 'text-red-500'">{{ voiceErrorMsg }}</span>
+            <button @click.stop="voiceResetError"
+                    class="voice-retry-btn text-[11px] px-1.5 py-0.5 rounded-md transition-colors shrink-0"
+                    :class="isDark ? 'text-wt-dim hover:text-red-400 hover:bg-red-400/10' : 'text-lt-aux hover:text-red-500 hover:bg-red-50'">
+              重试
+            </button>
+            <button @click.stop="voiceResetError"
+                    class="shrink-0 text-[14px] px-1 leading-none opacity-50 hover:opacity-100 transition-opacity"
+                    :class="isDark ? 'text-wt-aux hover:text-wt-sub' : 'text-lt-aux hover:text-lt-sub'"
+                    title="关闭">
+              <i class="ri-close-line" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -282,6 +500,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick, true))
           <!-- Attach button -->
           <button
             ref="attachBtnRef"
+            v-if="showAttach"
             @click="togglePopover('attach')"
             title="附件"
             class="toolbar-btn toolbar-btn-secondary h-8 px-2 sm:px-2.5 rounded-lg flex items-center gap-1 text-[0.8125rem] transition-colors shrink-0"
@@ -320,6 +539,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick, true))
           <!-- Wiki context button -->
           <button
             ref="wikiBtnRef"
+            v-if="showWiki"
             @click="togglePopover('wiki')"
             :title="selectedWikiNames.length ? selectedWikiNames.join('、') : 'Wiki'"
             class="toolbar-btn toolbar-btn-wiki h-8 px-2 sm:px-2.5 rounded-lg flex items-center gap-1 text-[0.8125rem] transition-colors min-w-0"
@@ -339,6 +559,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick, true))
           <!-- Context settings button -->
           <button
             ref="ctxBtnRef"
+            v-if="showContext"
             @click="togglePopover('ctx')"
             :title="isCompressing ? '压缩中' : '上下文'"
             class="toolbar-btn toolbar-btn-secondary h-8 px-2 sm:px-2.5 rounded-lg flex items-center gap-1 text-[0.8125rem] transition-colors shrink-0"
@@ -355,6 +576,48 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick, true))
             <i v-else class="ri-text-wrap text-[12px]" />
             <span class="toolbar-label toolbar-label-optional">{{ isCompressing ? '压缩中' : '上下文' }}</span>
           </button>
+
+          <!-- Voice input -->
+          <div v-if="showVoice" ref="voiceBtnRef" class="flex items-center gap-0.5 shrink-0">
+            <button
+              @click="handleVoiceClick"
+              :title="voiceTitle"
+              :disabled="voiceStatus === 'transcribing'"
+              class="voice-mic-btn toolbar-btn toolbar-btn-secondary h-8 px-2 sm:px-2.5 rounded-lg flex items-center gap-1 text-[0.8125rem] transition-colors duration-200"
+              :class="voiceButtonClass">
+              <i
+                :class="voiceStatus === 'recording' ? 'ri-mic-fill' : voiceStatus === 'transcribing' ? 'ri-loader-4-line' : 'ri-mic-line'"
+                class="text-[12px]"
+                :style="voiceStatus === 'recording' ? 'animation: voicePulse 1.2s ease-in-out infinite' : voiceStatus === 'transcribing' ? 'animation: spin 1s linear infinite' : ''" />
+              <span class="toolbar-label toolbar-label-optional">
+                {{ voiceStatus === 'recording' ? voiceFormatDuration() : voiceStatus === 'transcribing' ? '识别中' : '语音' }}
+              </span>
+              <span
+                v-if="voiceIsStreaming && voiceStatus === 'idle'"
+                class="text-[9px] px-1 py-0.5 rounded font-medium leading-none self-center"
+                :class="isDark ? 'bg-emerald-400/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'">
+                流式
+              </span>
+              <span
+                v-if="voiceIsRealtime && voiceStatus === 'idle'"
+                class="text-[9px] px-1 py-0.5 rounded font-medium leading-none self-center"
+                :class="isDark ? 'bg-amber-400/10 text-amber-400' : 'bg-amber-50 text-amber-600'">
+                实时
+              </span>
+            </button>
+            <button
+              v-if="voiceStatus === 'idle'"
+              @click.stop="toggleVoiceModelDropdown"
+              :title="'选择语音模型'"
+              class="h-8 w-5 rounded-lg flex items-center justify-center transition-colors"
+              :class="
+                showVoiceModelDropdown
+                  ? isDark ? 'text-brand-400 bg-brand-400/10' : 'text-brand-500 bg-brand-50'
+                  : isDark ? 'text-wt-aux hover:text-wt-sub hover:bg-white/5' : 'text-lt-aux hover:text-lt-sub hover:bg-l4'
+             ">
+              <i :class="showVoiceModelDropdown ? 'ri-arrow-down-s-line' : 'ri-arrow-up-s-line'" class="text-[12px]" />
+            </button>
+          </div>
 
           <!-- Clear messages button -->
           <button
@@ -373,7 +636,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick, true))
 
           <!-- Token counter -->
           <div
-            v-if="totalTokens > 0"
+            v-if="showTokenCounter && totalTokens > 0"
             class="chat-token-counter flex items-center gap-1.2 text-[12px] tabular-nums shrink-0"
             :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">
             <i class="ri-coin-line text-[12px]" />
@@ -381,7 +644,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick, true))
             <span :class="isDark ? 'text-output-400' : 'text-output-500'">
               {{ formatTokenCount(totalOutputTokens) }}↑
             </span>
-            <span v-if="lastLatencyMs" class="chat-token-extra flex items-center gap-0.5">
+            <span v-if="showLatency && lastLatencyMs" class="chat-token-extra flex items-center gap-0.5">
               <i class="ri-timer-line text-[12px]" />
               {{ lastLatencyMs < 1000 ? lastLatencyMs + 'ms' : (lastLatencyMs / 1000).toFixed(1) + 's' }}
             </span>
@@ -434,6 +697,78 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick, true))
     @clear-wiki="emit('clear-wiki')"
     @update-context-length="emit('update-context-length', $event)"
     @compress-context="emit('compress-context')" />
+  <!-- Voice model dropdown -->
+  <Teleport to="body">
+    <div
+      v-if="showVoiceModelDropdown"
+      id="voice-model-dropdown"
+      class="fixed z-[9999] rounded-xl shadow-2xl"
+      :class="isDark ? 'shadow-black/50' : 'shadow-black/20'"
+      :style="{ left: voiceModelPos.left + 'px', bottom: voiceModelPos.bottom + 'px', width: '260px' }">
+      <span
+        class="pointer-events-none absolute -bottom-[5px] h-2.5 w-2.5 rotate-45"
+        :class="isDark ? 'bg-d2 border-r border-b border-d4' : 'bg-l2 border-r border-b border-bdrF'"
+        :style="{ left: voiceModelPos.arrowLeft + 'px' }" />
+      <div
+        class="rounded-lg overflow-hidden"
+        :class="isDark ? 'bg-d2 border border-d4' : 'bg-l2 border border-bdrF'">
+        <div
+          class="px-3 py-2.5 flex items-center justify-between"
+          :class="isDark ? 'border-b border-d4' : 'border-b border-bdrL'">
+          <div class="flex items-center gap-1.5">
+            <i class="ri-mic-line text-[14px]" :class="isDark ? 'text-brand-400' : 'text-brand-500'" />
+            <span class="text-[12px] font-semibold" :class="isDark ? 'text-wt-main' : 'text-lt-main'">语音模型</span>
+          </div>
+          <button
+            @click="showVoiceModelDropdown = false"
+            class="h-5 w-5 rounded flex items-center justify-center transition-colors"
+            :class="isDark ? 'text-wt-dim hover:text-wt-sub hover:bg-white/5' : 'text-lt-aux hover:text-lt-sub hover:bg-l4'">
+            <i class="ri-close-line text-[14px]" />
+          </button>
+        </div>
+        <div class="p-2 max-h-[240px] overflow-y-auto">
+          <button
+            v-for="model in voiceAvailableModels"
+            :key="model.ref"
+            @click="selectVoiceModel(model.ref)"
+            class="voice-model-card w-full px-2.5 py-2 rounded-lg flex items-center gap-2 transition-all text-left relative"
+            :class="
+              model.ref === voiceSelectedModelRef
+                ? isDark ? 'bg-brand-400/10 text-brand-400 voice-card-active-dark' : 'bg-brand-50 text-brand-500 voice-card-active-light'
+                : isDark ? 'text-wt-sub hover:bg-white/5' : 'text-lt-sub hover:bg-l4'
+            ">
+            <i
+              :class="model.ref === voiceSelectedModelRef ? 'ri-check-line' : 'ri-mic-line'"
+              class="text-[12px] shrink-0" />
+            <div class="flex-1 min-w-0">
+              <div class="text-[12px] font-medium truncate">{{ model.modelName || model.modelId }}</div>
+              <div class="text-[10px] truncate" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">
+                {{ model.providerName }}
+                <span v-if="model.streaming" class="ml-1 px-1 rounded text-[9px]" :class="isDark ? 'bg-emerald-400/10 text-emerald-400' : 'bg-emerald-50 text-emerald-500'">流式</span>
+                <span v-if="model.providerId === 'aliyun_bailian_asr' && getAliyunAsrModelTypeLabel(model.modelId)" class="ml-1 px-1 rounded text-[9px] font-medium" :class="isDark ? 'bg-cyan-400/10 text-cyan-400' : 'bg-cyan-50 text-cyan-600'" :title="`${getAliyunAsrModelTypeLabel(model.modelId)}调用`">{{ getAliyunAsrModelTypeLabel(model.modelId) }}</span>
+                <span v-if="model.realtime" class="ml-1 px-1 rounded text-[9px]" :class="isDark ? 'bg-amber-400/10 text-amber-400' : 'bg-amber-50 text-amber-600'">实时</span>
+              </div>
+            </div>
+          </button>
+          <div v-if="!voiceAvailableModels.length" class="py-4 text-center">
+            <i class="ri-mic-off-line text-[20px] block mb-1.5" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'" />
+            <p class="text-[11px]" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">未配置可用模型</p>
+          </div>
+        </div>
+        <div
+          class="p-2"
+          :class="isDark ? 'border-t border-d4' : 'border-t border-bdrL'">
+          <button
+            @click="goToSpeechSettings"
+            class="w-full h-7 rounded-lg flex items-center justify-center gap-1.5 text-[11px] font-medium transition-colors"
+            :class="isDark ? 'text-brand-400 hover:bg-brand-400/10' : 'text-brand-500 hover:bg-brand-50'">
+            <i class="ri-settings-3-line text-[12px]" />
+            语音模型设置
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -690,4 +1025,128 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick, true))
     transform: rotate(360deg);
   }
 }
+
+/* === Voice status overlay === */
+.voice-status-overlay {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.voice-status-overlay.voice-bg-rec-dark {
+  background: linear-gradient(to bottom, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.03));
+}
+.voice-status-overlay.voice-bg-rec-light {
+  background: linear-gradient(to bottom, rgba(239, 68, 68, 0.06), rgba(239, 68, 68, 0.02));
+}
+.voice-status-overlay.voice-bg-load-dark {
+  background: linear-gradient(to bottom, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.03));
+}
+.voice-status-overlay.voice-bg-load-light {
+  background: linear-gradient(to bottom, rgba(99, 102, 241, 0.06), rgba(99, 102, 241, 0.02));
+}
+.voice-status-overlay.voice-bg-err-dark {
+  background: linear-gradient(to bottom, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.03));
+}
+.voice-status-overlay.voice-bg-err-light {
+  background: linear-gradient(to bottom, rgba(239, 68, 68, 0.06), rgba(239, 68, 68, 0.02));
+}
+
+.voice-rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: voiceRecPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes voiceRecPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { transform: scale(0.85); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+@keyframes voicePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* === Voice waveform === */
+.voice-waveform { overflow: hidden; }
+.voice-wave-bar {
+  width: 2.5px;
+  min-height: 2px;
+  border-radius: 9999px;
+  transition: height 80ms ease-out, opacity 80ms ease-out;
+}
+.voice-waveform-sm .voice-wave-bar { width: 2px; }
+
+/* === Mic button === */
+.voice-mic-btn {
+  min-height: 2rem;
+  max-height: 2rem;
+  transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.voice-mic-active { animation: voiceMicGlow 1.8s ease-in-out infinite; }
+@keyframes voiceMicGlow {
+  0%, 100% { opacity: 0.82; }
+  50% { opacity: 1; }
+}
+
+/* === Animated dots === */
+.voice-dots::after { content: ''; animation: voiceDots 1.5s steps(1) infinite; }
+@keyframes voiceDots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+  100% { content: ''; }
+}
+
+/* === Cancel / Retry === */
+.voice-cancel-btn, .voice-retry-btn { border: 1px solid transparent; line-height: 1.4; }
+.voice-cancel-btn:hover, .voice-retry-btn:hover { border-color: currentColor; }
+
+/* === Model card === */
+.voice-model-card { overflow: hidden; }
+.voice-card-active-dark::before, .voice-card-active-light::before {
+  content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 2.5px; height: 60%; border-radius: 0 2px 2px 0;
+}
+.voice-card-active-dark::before { background: rgba(129, 140, 248, 0.6); }
+.voice-card-active-light::before { background: rgba(99, 102, 241, 0.7); }
+
+/* === Streaming card === */
+.voice-stream-card {
+  border-radius: 10px; padding-left: 12px !important; padding-right: 12px !important;
+  border-left: 2px solid transparent;
+}
+.voice-card-dark {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.07), rgba(99, 102, 241, 0.01));
+  border-left-color: rgba(129, 140, 248, 0.3);
+}
+.voice-card-light {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(99, 102, 241, 0.01));
+  border-left-color: rgba(99, 102, 241, 0.25);
+}
+.voice-card-realtime-dark {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.06), rgba(245, 158, 11, 0.01));
+  border-left-color: rgba(251, 191, 36, 0.3);
+}
+.voice-card-realtime-light {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05), rgba(245, 158, 11, 0.01));
+  border-left-color: rgba(245, 158, 11, 0.25);
+}
+
+.voice-cursor {
+  display: inline-block; width: 2px; height: 1em; margin-left: 1px;
+  vertical-align: text-bottom; border-radius: 1px;
+  animation: voiceCursorBlink 0.8s step-end infinite;
+}
+@keyframes voiceCursorBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
 </style>

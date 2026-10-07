@@ -9,6 +9,8 @@ const props = defineProps({
   ariaLabel: { type: String, default: '选择选项' },
   disabled: { type: Boolean, default: false },
   compact: { type: Boolean, default: false },
+  dropUp: { type: Boolean, default: false },
+  menuMinWidth: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue', 'change'])
@@ -94,7 +96,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="rootRef" class="speech-select" :class="[{ 'speech-select--open': open, 'speech-select--compact': compact }, isDark ? 'speech-select--dark' : 'speech-select--light']" @focusout="handleFocusOut">
+  <div ref="rootRef" class="speech-select" :class="[{ 'speech-select--open': open, 'speech-select--compact': compact, 'speech-select--dropup': dropUp }, isDark ? 'speech-select--dark' : 'speech-select--light']" @focusout="handleFocusOut">
     <button
       type="button"
       class="speech-select__trigger"
@@ -114,7 +116,7 @@ onBeforeUnmount(() => {
     </button>
 
     <Transition name="speech-select-menu">
-      <div v-if="open" class="speech-select__menu" role="listbox" @keydown.esc.stop="closeMenu">
+      <div v-if="open" class="speech-select__menu" :style="menuMinWidth ? { minWidth: menuMinWidth } : null" role="listbox" @keydown.esc.stop="closeMenu">
         <button
           v-for="(option, index) in options"
           :key="String(option.value)"
@@ -145,7 +147,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .speech-select { position: relative; width: 100%; }
-.speech-select__trigger { width: 100%; height: var(--speech-control-height, 38px); min-height: var(--speech-control-height, 38px); padding: 3px 10px 3px 12px; border: 1px solid rgba(128,140,160,.2); border-radius: 8px; display: flex; align-items: center; gap: 8px; text-align: left; color: inherit; transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease; }
+.speech-select__trigger { width: 100%; height: var(--speech-control-height, 36px); min-height: var(--speech-control-height, 36px); padding: 3px 10px 3px 12px; border: 1px solid rgba(128,140,160,.2); border-radius: 8px; display: flex; align-items: center; gap: 8px; text-align: left; color: inherit; transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease; }
 .speech-select--compact .speech-select__trigger { padding-top: 3px; padding-bottom: 3px; }
 .speech-select--dark .speech-select__trigger { background: rgba(255,255,255,.035); }
 .speech-select--light .speech-select__trigger { background: rgba(18,28,45,.025); }
@@ -158,7 +160,10 @@ onBeforeUnmount(() => {
 .speech-select__badge { flex: none; padding: 2px 6px; border: 1px solid rgba(var(--brand-rgb),.2); border-radius: 999px; color: var(--brand); background: rgba(var(--brand-rgb),.08); font-size: 8.5px; font-weight: 700; }
 .speech-select__chevron { flex: none; font-size: 17px; opacity: .56; transition: transform 160ms ease, color 160ms ease; }
 .speech-select--open .speech-select__chevron { transform: rotate(180deg); color: var(--brand); opacity: 1; }
-.speech-select__menu { position: absolute; z-index: 80; top: calc(100% + 6px); left: 0; right: 0; max-height: min(320px, 45vh); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(var(--brand-rgb),.46) rgba(128,140,160,.1); padding: 5px; border: 1px solid rgba(128,140,160,.2); border-radius: 9px; box-shadow: 0 16px 38px rgba(0,0,0,.16); }
+.speech-select__menu { position: absolute; z-index: 80; top: calc(100% + 6px); left: 0; min-width: 100%; max-height: min(320px, 45vh); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(var(--brand-rgb),.46) rgba(128,140,160,.1); padding: 5px; border: 1px solid rgba(128,140,160,.2); border-radius: 9px; box-shadow: 0 16px 38px rgba(0,0,0,.16); }
+.speech-select--dropup .speech-select__menu { top: auto; bottom: calc(100% + 6px); box-shadow: 0 -16px 38px rgba(0,0,0,.16); }
+.speech-select--dropup .speech-select__chevron { transform: rotate(180deg); }
+.speech-select--dropup.speech-select--open .speech-select__chevron { transform: rotate(0deg); }
 .speech-select__menu::-webkit-scrollbar { width: 7px; }
 .speech-select__menu::-webkit-scrollbar-track { margin: 5px 0; border-radius: 999px; background: rgba(128,140,160,.08); }
 .speech-select__menu::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: rgba(var(--brand-rgb),.48); background-clip: padding-box; }
@@ -177,6 +182,7 @@ onBeforeUnmount(() => {
 .speech-select__option--selected .speech-select__check { color: #fff; border-color: var(--brand); background: var(--brand); }
 .speech-select-menu-enter-active, .speech-select-menu-leave-active { transition: opacity 140ms ease, transform 140ms ease; }
 .speech-select-menu-enter-from, .speech-select-menu-leave-to { opacity: 0; transform: translateY(-4px); }
+.speech-select--dropup .speech-select-menu-enter-from, .speech-select--dropup .speech-select-menu-leave-to { opacity: 0; transform: translateY(4px); }
 @media (prefers-reduced-motion: reduce) { .speech-select__trigger, .speech-select__chevron, .speech-select__option, .speech-select-menu-enter-active, .speech-select-menu-leave-active { transition: none; } }
 @media (max-width: 680px) { .speech-select__menu { max-height: min(280px, 42vh); } }
 </style>

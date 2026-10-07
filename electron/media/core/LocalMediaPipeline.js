@@ -7,6 +7,7 @@ import {
   MEDIA_RUN_STATUSES,
   MEDIA_STAGES,
 } from './MediaTypes.js'
+import { resolveProviderModelConfig } from '../../../src/utils/speechModelResolver.js'
 
 function throwIfCancelled(signal) {
   if (signal?.aborted) throw new MediaError(MEDIA_ERROR_CODES.CANCELLED, '媒体解析已取消。')
@@ -73,26 +74,39 @@ export class LocalMediaPipeline {
     const settings = this._getSpeechSettings() || {}
     const providers = settings.providers && typeof settings.providers === 'object' ? settings.providers : {}
     const configuredRunProviderId = String(run.config?.providerId || run.stt_provider_id || '').trim()
+    const runModelRef = String(run.config?.modelRef || '').trim()
     const requestedId = run.config?.localOnly ? 'local_asr' : (configuredRunProviderId || 'auto')
     const explicit = requestedId && requestedId !== 'auto'
     const defaultProviderId = String(settings.defaultProviderId || '').trim()
-    const candidates = explicit ? [requestedId] : [defaultProviderId].filter(Boolean)
+    // 兼容 v4：前端存的是 defaultModelRef（providerId::modelId），从中解析出默认服务商
+    const refProviderId = String((runModelRef || settings.defaultModelRef || '')).split('::')[0].trim()
+    const candidates = explicit ? [requestedId] : [...[defaultProviderId, refProviderId].filter(Boolean), ...Object.keys(providers)]
+    const seen = new Set()
+    let enabledButUnsupported = ''
+    const modelRef = runModelRef || settings.defaultModelRef || ''
     for (const providerId of candidates) {
-      const providerConfig = { ...(providers[providerId] || {}) }
+      if (!providerId || seen.has(providerId)) continue
+      seen.add(providerId)
+      // 解析出实际使用的模型并拍平进 config，否则 provider 读不到 config.model（兜底成 fun-asr）
+      const providerConfig = resolveProviderModelConfig(providers[providerId], modelRef, providerId)
       if (!providerConfig.enabled) continue
       const provider = this._speechToText.get(providerId)
+      if (!provider) continue
       const inputModes = provider?.getCapabilities?.(providerConfig)?.inputModes || []
-      if (!provider || (inputModes.length && !inputModes.includes(mode))) continue
+      if (inputModes.length && !inputModes.includes(mode)) {
+        if (!enabledButUnsupported) enabledButUnsupported = providerId
+        continue
+      }
       return { providerId, providerConfig, provider }
     }
     if (explicit && !providers[requestedId]?.enabled) {
       throw new MediaError(MEDIA_ERROR_CODES.STT_NOT_CONFIGURED, '所选语音转文字服务尚未启用。', { stage: 'stt', provider: requestedId })
     }
     if (explicit) throw new MediaError(MEDIA_ERROR_CODES.STT_INPUT_UNSUPPORTED, `所选语音转文字服务不支持 ${mode} 输入。`, { stage: 'stt', provider: requestedId })
-    if (defaultProviderId && providers[defaultProviderId]?.enabled) {
+    if (enabledButUnsupported) {
       throw new MediaError(MEDIA_ERROR_CODES.STT_INPUT_UNSUPPORTED, mode === 'public_url'
         ? '默认语音转文字服务不支持公网 URL 输入；请在媒体解析设置中明确选择其他服务商。'
-        : '默认语音转文字服务不支持本地文件输入；请在媒体解析设置中明确选择其他服务商。', { stage: 'stt', provider: defaultProviderId })
+        : '默认语音转文字服务不支持本地文件输入；请在媒体解析设置中明确选择其他服务商。', { stage: 'stt', provider: enabledButUnsupported })
     }
     throw new MediaError(MEDIA_ERROR_CODES.STT_NOT_CONFIGURED, '尚未启用默认语音转文字服务。', { stage: 'stt' })
   }
@@ -101,17 +115,22 @@ export class LocalMediaPipeline {
     const settings = this._getSpeechSettings() || {}
     const providers = settings.providers && typeof settings.providers === 'object' ? settings.providers : {}
     const configuredRunProviderId = String(run.config?.providerId || run.stt_provider_id || '').trim()
+    const runModelRef = String(run.config?.modelRef || '').trim()
     const requestedId = run.config?.localOnly ? 'local_asr' : (configuredRunProviderId || 'auto')
+    const refProviderId = String((runModelRef || settings.defaultModelRef || '')).split('::')[0].trim()
     const providerId = requestedId && requestedId !== 'auto'
       ? requestedId
       : (providers[settings.defaultProviderId]?.enabled
           ? settings.defaultProviderId
-          : (Object.keys(providers).find(id => providers[id]?.enabled) || ''))
+          : (providers[refProviderId]?.enabled
+              ? refProviderId
+              : (Object.keys(providers).find(id => providers[id]?.enabled) || '')))
     if (!providerId || !providers[providerId]?.enabled) {
       throw new MediaError(MEDIA_ERROR_CODES.STT_NOT_CONFIGURED, '尚未启用语音转文字服务。', { stage: 'stt', provider: providerId })
     }
     const provider = this._speechToText.get(providerId)
-    const providerConfig = { ...(providers[providerId] || {}) }
+    const modelRef = runModelRef || settings.defaultModelRef || ''
+    const providerConfig = resolveProviderModelConfig(providers[providerId], modelRef, providerId)
     const inputModes = provider?.getCapabilities?.(providerConfig)?.inputModes || []
     if (inputModes.includes('public_url')) return 'public_url'
     if (inputModes.includes('local_file')) return 'local_file'
@@ -131,6 +150,32 @@ export class LocalMediaPipeline {
         const extracted = await this._ffmpeg.extractAudio(inputPath, { outputPath: temporaryAudioPath, signal })
         sttInputs = [{ path: extracted, offsetMs: 0 }]
       }
+      const warnings = []
+      // 文件大小超出模型限制时自动分片（如 OpenAI 兼容 25MB、百炼短音频 10MB）
+      const sttCaps = provider?.getCapabilities?.(providerConfig) || {}
+      const maxFileBytes = Number(sttCaps.maxFileBytes) || 0
+      if (maxFileBytes && sttInputs.length === 1) {
+        const fileSize = fs.existsSync(sttInputs[0].path) ? fs.statSync(sttInputs[0].path).size : 0
+        if (fileSize > maxFileBytes) {
+          const durationMs = Number(metadata?.durationMs) || 0
+          const safeBytes = Math.floor(maxFileBytes * 0.85)
+          const chunkCount = Math.max(2, Math.ceil(fileSize / safeBytes))
+          const segmentSeconds = durationMs > 0
+            ? Math.min(300, Math.max(30, Math.floor((durationMs / chunkCount) / 1000)))
+            : 225
+          const sttPaths = this._artifactService.paths(run.media_id, run.id)
+          const chunkPattern = path.join(sttPaths.tempDir, 'analysis', 'stt_chunk_%03d.flac')
+          const chunks = await this._ffmpeg.extractAudioChunks(sttInputs[0].path, {
+            outputPattern: chunkPattern,
+            segmentSeconds,
+            signal,
+          })
+          if (chunks.length > 1) {
+            sttInputs = chunks
+            warnings.push(`文件 ${Math.round(fileSize / 1024 / 1024)}MB 超出模型限制 ${Math.round(maxFileBytes / 1024 / 1024)}MB，已自动分片为 ${chunks.length} 段转录。`)
+          }
+        }
+      }
       await this._stage(onStage, MEDIA_STAGES.STT, 55, '正在进行语音转文字')
       this._runs?.updateMediaRun?.(run.id, {
         sttProviderId: providerId,
@@ -138,7 +183,6 @@ export class LocalMediaPipeline {
       })
       const texts = []
       const segments = []
-      const warnings = []
       const usage = {}
       let partial = false
       let resultModel = providerConfig.model || providerConfig.backend || ''

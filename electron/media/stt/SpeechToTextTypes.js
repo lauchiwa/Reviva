@@ -1,6 +1,7 @@
 export const SPEECH_TO_TEXT_PROVIDER_IDS = Object.freeze({
   LOCAL_ASR: 'local_asr',
   OPENAI_WHISPER_COMPATIBLE: 'openai_whisper_compatible',
+  SILICONFLOW_ASR: 'siliconflow_asr',
   ALIYUN_BAILIAN_ASR: 'aliyun_bailian_asr',
 })
 

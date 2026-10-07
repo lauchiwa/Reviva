@@ -18,7 +18,7 @@ const isDark = computed(() => appStore.isDark)
 const accentHex = computed(() => settingsStore.currentAccentHex)
 
 const navGroups = [
-  { label: '模型', keys: ['default-models', 'models', 'speech-models', 'ocr'] },
+  { label: '模型', keys: ['default-models', 'models', 'speech-models', 'image-models', 'ocr'] },
   { label: '工作台', keys: ['directory', 'environment', 'sandbox', 'creation-tools'] },
   { label: '记录与统计', keys: ['memory', 'learning-memory', 'usage'] },
   { label: '界面与桌面', keys: ['theme', 'preference', 'shortcuts', 'quick-inputs', 'notifications'] },
@@ -28,11 +28,12 @@ const navGroups = [
 const sectionMap = {
   'default-models': { name: '默认模型', icon: 'ri-cloudy-line', color: 'brand', hint: '为对话、Skill、Agent、翻译等指定默认模型' },
   models: { name: '模型服务', icon: 'ri-ai-generate-3d-line', color: 'agent', hint: '配置 LLM 服务商与模型启用' },
-  'speech-models': { name: '语音模型配置', icon: 'ri-mic-line', color: 'amber', hint: '配置语音转文本服务；文本转语音将在后续版本开放' },
+  'speech-models': { name: '语音模型配置', icon: 'ri-mic-ai-line', color: 'amber', hint: '配置语音转文本服务；文本转语音将在后续版本开放' },
+  'image-models': { name: '图像模型配置', icon: 'ri-image-ai-line', color: 'sky', hint: '配置图像生成与编辑模型（OpenAI Images / DashScope / Gemini 原生）' },
   // network: { name: '网络与代理', icon: 'ri-global-line', color: 'blue', hint: '代理设置 · 中国用户访问国外 API 必备' },
   directory: { name: '目录与权限', icon: 'ri-folder-shield-line', color: 'emerald', hint: '设置 Agent 可访问的目录与权限范围' },
   environment: { name: '环境管理', icon: 'ri-tools-line', color: 'emerald', hint: '检测 Python / Node / FFmpeg / Pandoc 等系统依赖' },
-  ocr: { name: 'OCR 模型配置', icon: 'ri-scan-2-line', color: 'emerald', hint: '配置 PaddleOCR、MinerU等服务商' },
+  ocr: { name: 'OCR 模型配置', icon: 'ri-character-recognition-line', color: 'emerald', hint: '配置 PaddleOCR、MinerU等服务商' },
   sandbox: { name: '沙箱与限流', icon: 'ri-shield-check-line', color: 'amber', hint: 'Agent 沙箱执行环境的全局配置' },
   'creation-tools': { name: '创作工具', icon: 'ri-quill-pen-ai-line', color: 'brand', hint: '控制创作中心工具的显示与顺序' },
   memory: { name: '记忆管理', icon: 'ri-brain-line', color: 'rose', hint: '管理 Agent 与对话使用的长期记忆' },

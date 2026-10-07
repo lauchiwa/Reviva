@@ -51,6 +51,7 @@ export function createMediaModule(dependencies = {}) {
   const speechToTextRegistry = new SpeechToTextRegistry([
     new LocalAsrProvider(),
     new OpenAiWhisperProvider(),
+    new OpenAiWhisperProvider({ id: 'siliconflow_asr', displayName: '硅基流动' }),
     new AliyunBailianAsrProvider(),
   ])
   const directDownloader = new DirectMediaDownloader()

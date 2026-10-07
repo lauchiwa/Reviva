@@ -1,0 +1,7 @@
+{
+  "storage_type": "data",
+  "artifact_type": "studycard",
+  "icon": "ri-coupon-line",
+  "color": "amber",
+  "title_template": "{title}"
+}

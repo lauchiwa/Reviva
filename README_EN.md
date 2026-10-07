@@ -13,6 +13,9 @@ Desktop · Local-First · AI Agent · Learning Toolkit
 </p>
 
 <p>
+  <a href="https://www.reviva.cn/">
+    <img src="https://img.shields.io/badge/Website-Reviva-4A6CFF?logo=googlechrome&logoColor=white" alt="Website" />
+  </a>
   <a href="https://github.com/mingchen666/Reviva/releases">
     <img src="https://img.shields.io/github/v/release/mingchen666/Reviva?include_prereleases&label=release&color=4A6CFF" alt="Release" />
   </a>
@@ -54,16 +57,18 @@ Reviva = local document library + Wiki knowledge base + AI Agent + knowledge ret
 
 It is for anyone who wants AI to become part of a real learning and knowledge workflow, instead of starting from a blank chat every time.
 
+> 🌐 **The Reviva website is now live** — Full overview, feature demos, and latest updates — visit the [Website](https://www.reviva.cn/)
+> <!-- TODO: replace with the Reviva website URL -->
+
 <table width="100%">
   <tr>
     <td align="center">
-      <h2>🎉 Reviva 1.3.0 Official Release</h2>
-      <p><b>The first stable release is now available.</b></p>
-      <p>Use an Agent-centered workspace to connect local materials, knowledge bases, notes, and learning tools from understanding and review to creative output.</p>
-      <p><b>Agent-driven · Local-first · Multi-source chat · Visual learning · Continuous knowledge capture</b></p>
+      <h2>🎉 Reviva v1.4.0 Official Release</h2>
+      <p>With Agent at its core, it connects local materials, knowledge bases, notes, and learning tools to complete the full learning workflow from understanding and review to creative output.</p>
+      <p><b>Agent-driven · Local-first · 13 creation tools · Bring your own knowledge base · Learning profile (Beta)</b></p>
       <p>
-        <a href="https://github.com/mingchen666/Reviva/releases/latest"><img src="https://img.shields.io/badge/Download-Reviva_1.3.0-4A6CFF?style=for-the-badge&logo=github&logoColor=white" alt="Download Reviva 1.3.0" /></a>
-        <a href="https://github.com/mingchen666/Reviva/releases"><img src="https://img.shields.io/badge/Release-Notes-111827?style=for-the-badge" alt="Release Notes" /></a>
+        <a href="https://github.com/mingchen666/Reviva/releases/latest"><img src="https://img.shields.io/badge/Download-Reviva_1.4.0-4A6CFF?style=for-the-badge&logo=github&logoColor=white" alt="Download Reviva 1.4.0" /></a>
+        <a href="https://github.com/mingchen666/Reviva/releases"><img src="https://img.shields.io/badge/Release-Changelog-111827?style=for-the-badge" alt="Changelog" /></a>
         <a href="#contact-and-community"><img src="https://img.shields.io/badge/Join-Community-16A34A?style=for-the-badge" alt="Join the community" /></a>
       </p>
     </td>
@@ -95,11 +100,19 @@ The screenshots below show the main work areas in the current desktop version:
     <td><img src="docs/images/agents.png" alt="Agent Management" /></td>
   </tr>
   <tr>
+    <td align="center"><b>Notes</b><br />Take notes, export chat to notes, and accumulate learning</td>
     <td align="center"><b>Wiki Knowledge Base</b><br />Turn materials into searchable, traceable knowledge</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/note.png" alt="Notes" /></td>
+    <td><img src="docs/images/wiki.png" alt="Wiki Knowledge Base" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Knowledge Base</b><br />Manage local and external knowledge bases</td>
     <td align="center"><b>Settings</b><br />Configure models, memory, permissions, environment, themes, and usage</td>
   </tr>
   <tr>
-    <td><img src="docs/images/wiki.png" alt="Wiki Knowledge Base" /></td>
+    <td><img src="docs/images/kb.png" alt="Knowledge Base" /></td>
     <td><img src="docs/images/settings.png" alt="Settings" /></td>
   </tr>
 </table>
@@ -127,9 +140,12 @@ Most AI tools start from a blank chat box, while real learning keeps accumulatin
 | 🤖 **Multi-Agent collaboration** | Switch Agents in a conversation; Agents share context and use global Agent memory to retain long-term preferences |
 | 📚 **Material-grounded chat** | Select local documents, entire folders, or Wiki knowledge bases as context; use `@` quick input and `/` commands to call content and Skills |
 | 🎬 **Audio and video learning** | Parse audio and video, transcribe speech, extract keyframes, and ask questions about selected media in the conversation |
-| 🧩 **Visual learning and creation** | Generate quizzes, flashcards, mind maps, knowledge graphs, charts, PPTs, podcasts, and deep research reports, then view the results visually |
+| 🧩 **Visual learning and creation** | 13 creation tools turn materials into quizzes, flashcards, study cards, Q&A, glossaries, cheatsheets, mind maps, knowledge graphs, charts, study guides, PPTs, and deep research reports |
+| 🎤 **Voice input and multimodal models** | Dictate in the learning workspace; configure chat, speech recognition, image generation/editing, and OCR models separately |
+| 🔌 **Bring your own knowledge base** | Built-in KBP protocol connects Dify, FastGPT, MCP, or custom HTTP knowledge bases and retrieves from them during chat; API keys stay local |
+| 📈 **Learning profile (beta)** | Keeps learning goals, concept status, misconceptions, and review needs across conversations so an Agent can continue where it left off; records can be paused, reverted, and exported |
 | 🗂️ **Continuous knowledge capture** | Upload materials, let an Agent maintain Wiki knowledge, and feed conversation results back into notes, documents, and future learning |
-| 🔐 **Custom models and data control** | Connect your own API keys, OpenAI-compatible services, cloud models, or local models; configure Agents, token usage, permissions, and backups |
+| 🔐 **Custom models and data control** | Connect your own API keys, OpenAI-compatible, Anthropic, or OpenAI Responses services, or local Ollama models; configure Agents, token usage, permission sandbox, and three backup modes |
 
 ### Agent-Driven Workflow
 
@@ -166,6 +182,9 @@ Imagine you have a recorded lecture and its course handouts:
 - Switch Agents in the learning workspace while keeping reusable material context
 - Use `@` quick input and `/` slash commands to call Skills
 - Streaming responses, task status, conversation task notifications, and background progress
+- Two ways to navigate a long conversation: summary outline and message thumbnails
+- Voice input, plus a customizable input bar where attachments, Wiki selection, voice, token counter, and elapsed time can be shown or hidden
+- Reasoning display with visible Agent steps and tool calls
 - Query documents directly from Agent output, open source references, and preview HTML, charts, and other visual artifacts
 
 ### 🎓 Visual Learning and Content Creation
@@ -176,14 +195,19 @@ Reviva does more than produce text. The learning workspace can turn the current 
 | --- | --- |
 | Quiz | Generate multiple-choice, true/false, fill-in-the-blank, and short-answer questions to find weak areas |
 | Flashcards | Break concepts, formulas, vocabulary, and mistakes into reviewable memory cards |
+| Study cards | Four interactive card types per exam point, with cover-to-reveal self-testing, swipe navigation, spaced-repetition rounds, and progress stats |
+| Q&A | Turn material into FAQ entries and guided question-answer pairs |
+| Glossary | Collect terms and definitions into a course glossary page |
+| Cheatsheet | Compress formulas, solution steps, and common mistakes onto one page |
 | Mind map | Organize a chapter, course, or project into a hierarchy |
 | Knowledge graph | Show relationships between concepts, people, events, and knowledge points |
 | Charts | Generate flowcharts, comparisons, matrices, and other visual results |
+| Study guide | Produce structured study material with a consolidated summary |
 | PPT | Create presentation decks from materials, knowledge bases, or research results |
-| Podcast | Rewrite long documents and course materials into listenable podcast scripts and audio |
 | Deep research | Break down questions, collect evidence, and produce structured research reports |
+| Podcast | Rewrite long documents and course materials into listenable podcast scripts and audio |
 
-Local generation is suitable for fast study and organization. PPT, deep research, and some cloud creation capabilities may require cloud models or pay-as-you-go services.
+Twelve of the thirteen tools run locally; the podcast tool uses the cloud service. Local generation is suitable for fast study and organization. PPT, deep research, and some cloud creation capabilities may require cloud models or pay-as-you-go services. Creation tools can be shown, hidden, and reordered in Settings.
 
 ### 📄 Documents, Office, and OCR
 
@@ -206,8 +230,9 @@ Local generation is suitable for fast study and organization. PPT, deep research
 
 ### 🤖 Agents and Extensions
 
-- Built-in Agents such as quiz generation assistants, learning coaches, and final-exam review assistants
-- Create and manage custom Agents
+- 18 built-in learning Agents: general study assistant, concept explainer, Feynman coach, Socratic tutor, final-exam review assistant, exam simulator, mistake analyzer, quiz generator, flashcard generator, K12 math/english/physics/chemistry assistants, computer-science and computer-network assistants, civil-service exam coach, teaching-research assistant, and presentation builder
+- 61 built-in Skills covering study methods, subject content, visualization and animation, creation and office work, and teaching; create, AI-generate, or import your own Skills
+- Create and manage custom Agents, with Agent health checks
 - Multiple Agents can share knowledge bases, documents, notes, and tool context
 - Configure prompts, models, Skills, tools, knowledge bases, and output styles for each Agent
 - Built-in tools for file reading, writing, web search, and knowledge-base queries
@@ -220,14 +245,29 @@ Local generation is suitable for fast study and organization. PPT, deep research
 - Create multiple Wiki knowledge bases for courses, papers, projects, or topics
 - Let an Agent organize and maintain Wiki pages after you upload and select documents
 - Source tracing, knowledge retrieval, and material-grounded Q&A
-- Markdown notes with folders, search, preview, and AI-assisted editing
+- Markdown notes with folders, search, preview, collapsible code blocks, and AI-assisted editing
+- Wiki page checks (lint) and semantic audit, with every page traceable back to its source material
+
+### 🔌 External Knowledge Bases (KBP, Beta)
+
+Reviva ships with the **KBP (Knowledge Base Protocol)** so Agents can retrieve from your private knowledge base during chat.
+
+- **Dify / FastGPT**: enter an API key and the knowledge base list is fetched in one step
+- **MCP servers**: existing retrieval tools are discovered automatically, with no configuration
+- **Custom knowledge bases**: paste an HTTP request/response example and the adapter configuration is generated for you
+- Retrieval can be enabled per conversation from the sidebar, and API keys are stored locally
+
+> This feature is in beta; the main scenarios already work.
 
 ### ⚙️ System and Data
 
-- Light and dark themes, custom theme colors, and Agent tone settings
-- Configure your own LLM models, including API keys, OpenAI-compatible services, and local models
+- Light and dark themes, 7 built-in themes, custom CSS themes (beta), custom theme colors, and Agent tone settings
+- Configure chat, speech recognition, image generation/editing, and OCR models across API keys, OpenAI-compatible, Anthropic, OpenAI Responses, and local models
+- Learning profile (beta): goals, concept status, misconceptions, and review needs carried across conversations, with pause, revert, and export controls
 - Visualize token usage, model calls, and task status
 - Global shortcuts, task notifications, and automatic update checks
+- A built-in beginner guide that walks through the working directory, model configuration, and the first material-grounded conversation
+- Multiple workspaces with registration, switching, and migration, plus cache and temporary file cleanup
 - Detect runtime dependencies such as Pandoc, Manim, FFmpeg, and OfficeCLI for optional installation
 - Three backup modes: full data backup, compact backup, and database backup
 - Unified Recycle Bin for restoring or permanently deleting documents, notes, conversations, and more
@@ -243,6 +283,7 @@ Local generation is suitable for fast study and organization. PPT, deep research
 | Skills | Manage built-in and custom capability modules that can be bound to Agents |
 | Tools | Manage built-in tools, custom tools, and MCP services |
 | Knowledge Base / Wiki | Manage knowledge bases for courses, papers, projects, and review materials |
+| External Knowledge Bases | Connect Dify, FastGPT, MCP, or custom HTTP knowledge bases for retrieval during chat (beta) |
 | Documents | Manage local materials, folders, Office documents, and media files |
 | Notes | Create and manage Markdown notes and folders |
 | Tasks | Track generation tasks, media parsing tasks, and learning tasks |
@@ -301,7 +342,7 @@ For detailed installation, environment, and feature documentation, see the docum
 
 ## Project Status
 
-Reviva's current official version is `1.0.0`. Features and UI continue to evolve. The project currently targets Windows and macOS desktop users; back up important data before long-term use.
+Reviva's current official version is `1.3.1`. Features and UI continue to evolve. The project currently targets Windows and macOS desktop users; back up important data before long-term use.
 
 For issues, please open a [GitHub Issue](https://github.com/mingchen666/Reviva/issues).
 
@@ -314,8 +355,13 @@ For issues, please open a [GitHub Issue](https://github.com/mingchen666/Reviva/i
 - [x] Responses API format
 - [x] Custom Skills
 - [ ] More built-in Agents and Skills
+- [x] Conversation navigation
 - [x] Improved import, export, and backup capabilities
 - [x] Agent autonomous learning growth loop (accumulate user preferences, learning profiles, and weak points over time; keep all growth results auditable, reversible, and evaluable)(beta)
+- [x] External knowledge bases through the KBP protocol (Dify / FastGPT / MCP / custom HTTP)(beta)
+- [x] Study cards, study guide, Q&A, glossary, and cheatsheet creation tools
+- [x] Voice input, image generation/editing model configuration, and 7 built-in themes
+- [x] Beginner guide and local gateway integration docs
 - [ ] More...
 
 ## License and Commercial Use

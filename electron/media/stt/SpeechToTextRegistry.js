@@ -44,6 +44,20 @@ export class SpeechToTextRegistry {
     }
   }
 
+  async listModels(providerId, config = {}, context = {}) {
+    const provider = this.get(providerId)
+    if (!provider) throw new MediaError(MEDIA_ERROR_CODES.STT_PROVIDER_UNAVAILABLE, `未找到语音转文字服务商：${providerId}`)
+    if (typeof provider.listModels !== 'function') {
+      throw new MediaError(MEDIA_ERROR_CODES.INVALID_ARGUMENT, `${provider.displayName || provider.id} 暂不支持获取模型列表。`, { provider: provider.id })
+    }
+    const result = await provider.listModels(config, context)
+    return {
+      success: true,
+      providerId: provider.id,
+      models: Array.isArray(result?.models) ? result.models : [],
+    }
+  }
+
   list() {
     return [...this._providers.values()].map(provider => ({
       id: provider.id,

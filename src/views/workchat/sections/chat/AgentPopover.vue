@@ -40,7 +40,7 @@ const filteredBuiltin = computed(() => {
         <span class="text-[12px] font-semibold" :class="isDark ? 'text-wt-main' : 'text-lt-main'">选择 Agent</span>
         <button @click="emit('close')" class="h-5 w-5 rounded flex items-center justify-center transition-colors"
           :class="isDark ? 'text-wt-dim hover:text-wt-sub hover:bg-white/5' : 'text-lt-aux hover:text-lt-sub hover:bg-l4'">
-          <i class="ri-close-line text-[12px]" />
+          <i class="ri-close-line text-[16px]" />
         </button>
       </div>
       <div class="relative">

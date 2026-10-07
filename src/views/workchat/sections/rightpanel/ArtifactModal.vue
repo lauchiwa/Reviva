@@ -10,6 +10,7 @@ import ChartsPreview from '@/components/preview/ChartsPreview.vue'
 import QaPreview from '@/components/preview/QaPreview.vue'
 import GlossaryPreview from '@/components/preview/GlossaryPreview.vue'
 import CheatsheetPreview from '@/components/preview/CheatsheetPreview.vue'
+import StudyCardPreview from '@/components/preview/StudyCardPreview.vue'
 import ReferenceContextList from './modals/ReferenceContextList.vue'
 
 const props = defineProps({
@@ -21,7 +22,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'delete'])
 
 const typeLabels = {
-  summary: '摘要', mindmap: '思维导图', flashcard: '闪卡',
+  summary: '摘要', mindmap: '思维导图', flashcard: '闪卡', studycard: '知识卡片',
   quiz: '测验', chart: '图表', qa: 'Q&A 问答卡', glossary: '术语表', cheatsheet: '速查表', ppt: 'PPT', presentation: 'PPT', podcast: '播客', graph: '知识图谱', research: '深度研究', custom: '自定义',
 }
 
@@ -73,6 +74,7 @@ const isData = computed(() => props.artifact?.storage_type === 'data')
 const isMindmap = computed(() => props.artifact?.type === 'mindmap')
 const isGraph = computed(() => props.artifact?.type === 'graph')
 const isFlashcard = computed(() => props.artifact?.type === 'flashcard')
+const isStudycard = computed(() => props.artifact?.type === 'studycard')
 const isQuiz = computed(() => props.artifact?.type === 'quiz')
 const isChart = computed(() => props.artifact?.type === 'chart')
 const isQa = computed(() => props.artifact?.type === 'qa')
@@ -83,7 +85,7 @@ const isPodcast = computed(() => props.artifact?.type === 'podcast')
 // For structured data renderers: parse JSON from artifact.content and adapt to preview props.
 const parsedDataPayload = computed(() => {
   if (!isData.value || !props.artifact?.content) return null
-  if (!isMindmap.value && !isGraph.value && !isFlashcard.value && !isQuiz.value && !isChart.value && !isQa.value && !isGlossary.value && !isCheatsheet.value) return null
+  if (!isMindmap.value && !isGraph.value && !isFlashcard.value && !isQuiz.value && !isChart.value && !isQa.value && !isGlossary.value && !isCheatsheet.value && !isStudycard.value) return null
   try {
     const json = JSON.parse(props.artifact.content)
     return { result_json: { artifact_id: props.artifact.id, ...json } }
@@ -206,7 +208,7 @@ const renderedContent = computed(() => {
 // JSON viewer for unsupported data types (not mindmap/graph)
 const isRawJsonData = computed(() => {
   if (!isData.value || !props.artifact?.content) return false
-  return !['summary', 'research', 'mindmap', 'graph', 'flashcard', 'quiz', 'chart', 'qa', 'glossary', 'cheatsheet'].includes(props.artifact.type)
+  return !['summary', 'research', 'mindmap', 'graph', 'flashcard', 'quiz', 'chart', 'qa', 'glossary', 'cheatsheet', 'studycard'].includes(props.artifact.type)
 })
 
 function openFile() {
@@ -220,7 +222,7 @@ function showInFolder() {
 function handleDelete() { emit('delete', props.artifact) }
 
 // Mindmap / Graph render in fullscreen modal — different sizing
-const isFullscreenRenderer = computed(() => isMindmap.value || isGraph.value || isFlashcard.value || isQuiz.value || isChart.value || isQa.value || isGlossary.value || isCheatsheet.value || isHtmlFile.value)
+const isFullscreenRenderer = computed(() => isMindmap.value || isGraph.value || isFlashcard.value || isQuiz.value || isChart.value || isQa.value || isGlossary.value || isCheatsheet.value || isStudycard.value || isHtmlFile.value)
 </script>
 
 <template>
@@ -232,7 +234,7 @@ const isFullscreenRenderer = computed(() => isMindmap.value || isGraph.value || 
     <div class="relative rounded-xl overflow-hidden shadow-2xl flex flex-col"
       :class="[
         isDark ? 'bg-d2 border border-d4' : 'bg-l2 border border-bdrF',
-        isFullscreenRenderer ? 'w-[92vw] h-[88vh] max-w-[1280px]' : 'w-[560px] max-h-[80vh]'
+        isFullscreenRenderer ? 'w-[92vw] h-[88vh] max-w-[1280px]' : 'w-[720px] max-h-[80vh]'
       ]">
 
       <!-- Header -->
@@ -317,6 +319,10 @@ const isFullscreenRenderer = computed(() => isMindmap.value || isGraph.value || 
 
         <!-- Cheat sheet renderer -->
         <CheatsheetPreview v-else-if="isCheatsheet && parsedDataPayload"
+          :data="parsedDataPayload" :is-dark="isDark" />
+
+        <!-- Study card renderer -->
+        <StudyCardPreview v-else-if="isStudycard && parsedDataPayload"
           :data="parsedDataPayload" :is-dark="isDark" />
 
         <!-- Parse error for structured data renderers -->

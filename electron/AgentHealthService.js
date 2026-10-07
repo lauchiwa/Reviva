@@ -323,6 +323,7 @@ export class AgentHealthService {
       { id: 'pptx-exporter', name: 'PPTX Exporter', aliases: ['sa_pptx-exporter'] },
       { id: 'reviewer', name: 'Reviewer', aliases: ['visual-reviewer', 'sa_visual-reviewer'] },
       { id: 'flashcard-generator', name: 'Flashcard Generator', aliases: ['flashcard_generator'], tools: ['file_read', 'file_write', 'kb_search'] },
+      { id: 'studycard-generator', name: 'Study Card Generator', aliases: ['studycard_generator'], tools: ['file_read', 'file_write', 'kb_search'] },
       { id: 'quiz-generator', name: 'Quiz Generator', aliases: ['quiz_generator'], tools: ['file_read', 'file_write', 'kb_search'] },
       { id: 'study-planner', name: 'Study Planner', aliases: ['study_planner'] },
     ]

@@ -161,6 +161,12 @@ const router = createRouter({
           meta: { title: '语音模型配置' },
         },
         {
+          path: 'image-models',
+          name: 'SettingsImageModels',
+          component: () => import('@/views/settings/sections/ImageModelsSection.vue'),
+          meta: { title: '图像模型配置' },
+        },
+        {
           path: 'directory',
           name: 'SettingsDirectory',
           component: () => import('@/views/settings/sections/DirectorySection.vue'),

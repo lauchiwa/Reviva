@@ -12,6 +12,8 @@ import { PptGenerationModule } from './modules/PptGenerationModule.js'
 import { QaGenerationModule } from './modules/QaGenerationModule.js'
 import { QuizGenerationModule } from './modules/QuizGenerationModule.js'
 import { ResearchGenerationModule } from './modules/ResearchGenerationModule.js'
+import { StudyguideGenerationModule } from './modules/StudyguideGenerationModule.js'
+import { StudyCardGenerationModule } from './modules/StudyCardGenerationModule.js'
 
 export const CLOUD_NOT_READY_ERR = '云端服务即将开放，敬请期待'
 
@@ -30,6 +32,7 @@ export class GenerationModuleRegistry {
       ['mindmap', new MindmapGenerationModule({ jsonRunner })],
       ['graph', new GraphGenerationModule({ jsonRunner })],
       ['flashcard', new FlashcardGenerationModule({ jsonRunner })],
+      ['studycard', new StudyCardGenerationModule({ jsonRunner })],
       ['quiz', new QuizGenerationModule({ jsonRunner })],
       ['chart', new ChartGenerationModule({ jsonRunner })],
       ['qa', new QaGenerationModule({ jsonRunner })],
@@ -37,6 +40,7 @@ export class GenerationModuleRegistry {
       ['cheatsheet', new CheatsheetGenerationModule({ jsonRunner })],
       ['ppt', new PptGenerationModule({ agentRunner, cloudRunner })],
       ['research', new ResearchGenerationModule({ agentRunner, cloudRunner })],
+      ['studyguide', new StudyguideGenerationModule({ agentRunner, cloudRunner })],
       ['podcast', new PodcastGenerationModule({ cloudRunner })],
     ])
   }

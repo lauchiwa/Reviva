@@ -14,6 +14,9 @@
 
 
 <p>
+  <a href="https://www.reviva.cn/">
+    <img src="https://img.shields.io/badge/%E5%AE%98%E7%BD%91-Reviva-4A6CFF?logo=googlechrome&logoColor=white" alt="官网" />
+  </a>
   <a href="https://github.com/mingchen666/Reviva/releases">
     <img src="https://img.shields.io/github/v/release/mingchen666/Reviva?include_prereleases&label=release&color=4A6CFF" alt="Release" />
   </a>
@@ -55,14 +58,16 @@ Reviva = 本地资料库 + Wiki 知识库 + AI Agent + 知识库检索 + 笔记�
 
 它适合希望把 AI 真正接入学习和知识管理流程的人——不是每次都从一个空白聊天框重新开始。
 
+> 🌐 **Reviva 官网已上线** —— 完整介绍、功能演示与最新动态，欢迎前往 [官网](https://www.reviva.cn/) 查看
+
 <table width="100%">
   <tr>
     <td align="center">
-      <h2>🎉 Reviva v1.2.0系列 正式发布</h2>
+      <h2>🎉 Reviva v1.4.0 正式发布</h2>
       <p>以 Agent 为核心，连接本地资料、知识库、笔记与学习工具，完成从理解、复习到创作输出的完整学习工作流。</p>
-      <p><b>Agent 驱动 · 本地优先 · 多资料对话 · 可视化学习 · 知识持续沉淀</b></p>
+      <p><b>Agent 驱动 · 本地优先 · 13 个创作工具 · 可接入外部知识库 · 成长画像 Beta</b></p>
       <p>
-        <a href="https://github.com/mingchen666/Reviva/releases/latest"><img src="https://img.shields.io/badge/Download-Reviva_1.3.0-4A6CFF?style=for-the-badge&logo=github&logoColor=white" alt="下载 Reviva 1.3.0" /></a>
+        <a href="https://github.com/mingchen666/Reviva/releases/latest"><img src="https://img.shields.io/badge/Download-Reviva_1.4.0-4A6CFF?style=for-the-badge&logo=github&logoColor=white" alt="下载 Reviva 1.4.0" /></a>
         <a href="https://github.com/mingchen666/Reviva/releases"><img src="https://img.shields.io/badge/Release-更新日志-111827?style=for-the-badge" alt="查看发布说明" /></a>
         <a href="#联系与交流"><img src="https://img.shields.io/badge/Join-交流群-16A34A?style=for-the-badge" alt="加入用户交流群" /></a>
       </p>
@@ -94,11 +99,19 @@ Reviva = 本地资料库 + Wiki 知识库 + AI Agent + 知识库检索 + 笔记�
     <td><img src="docs/images/agents.png" alt="智能体管理" /></td>
   </tr>
   <tr>
+    <td align="center"><b>笔记</b><br />记笔记、对话导出笔记，沉淀学习内容</td>
     <td align="center"><b>Wiki 知识库</b><br />让资料持续沉淀为可检索、可追溯的知识</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/note.png" alt="笔记" /></td>
+    <td><img src="docs/images/wiki.png" alt="Wiki 知识库" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>知识库</b><br />管理本地与外部知识库</td>
     <td align="center"><b>设置中心</b><br />配置模型、记忆、权限、环境、主题和用量</td>
   </tr>
   <tr>
-    <td><img src="docs/images/wiki.png" alt="Wiki 知识库" /></td>
+    <td><img src="docs/images/kb.png" alt="知识库" /></td>
     <td><img src="docs/images/settings.png" alt="设置中心" /></td>
   </tr>
 </table>
@@ -126,9 +139,12 @@ Reviva = 本地资料库 + Wiki 知识库 + AI Agent + 知识库检索 + 笔记�
 | 🤖 **多 Agent 协作** | 在对话中随时切换 Agent；不同 Agent 可以共享上下文，并使用全局 Agent 记忆保存长期偏好 |
 | 📚 **围绕资料对话** | 直接选择本地文档、整个文件夹或 Wiki 知识库作为上下文，通过 `@` 快捷输入和 `/` 斜杠命令快速调用内容与技能 |
 | 🎬 **音视频学习** | 解析音频和视频，完成语音转录、关键帧提取和内容索引；在对话中选中媒体后即可围绕具体内容提问 |
-| 🧩 **可视化学习与创作** | 从资料生成测验、闪卡、思维导图、知识图谱、图表、PPT、播客和深度研究报告，并可视化查看结果 |
+| 🧩 **可视化学习与创作** | 13 个创作工具把资料变成测验、闪卡、知识卡片、Q&A、术语表、速查表、思维导图、知识图谱、图表、学习指南、PPT 和深度研究报告，并可视化查看结果 |
+| 🎤 **语音输入与多模态模型** | 对话工作台支持语音输入免打字；对话、语音（ASR）、图像生成编辑和 OCR 四类模型可分别配置 |
+| 🔌 **接入你已有的知识库** | 内置 KBP 协议，Dify、FastGPT、MCP 或自定义 HTTP 知识库都能接进来，对话时自动检索；API Key 存在本地 |
+| 📈 **成长画像（Beta）** | 跨对话维护学习目标、概念掌握状态、误区和复习需求，让 Agent 接着上次辅导继续；记录可暂停、可撤销、可导出 |
 | 🗂️ **知识持续沉淀** | 上传文档资料，将资料自动维护为 Wiki 知识库，并让对话结果继续回流到笔记、文档和后续学习中 |
-| 🔐 **自定义模型与数据控制** | 接入自有 API Key、OpenAI-compatible 服务、云端模型或本地模型；自定义Agent、Token 消耗统计与数据备份 |
+| 🔐 **自定义模型与数据控制** | 接入自有 API Key、OpenAI-compatible、Anthropic、OpenAI Responses 服务或本地 Ollama 模型；自定义 Agent、Token 消耗统计、权限沙箱与三种数据备份 |
 
 ### Agent 驱动的工作方式
 
@@ -165,6 +181,9 @@ Reviva = 本地资料库 + Wiki 知识库 + AI Agent + 知识库检索 + 笔记�
 - 在学习工作台中随时切换 Agent，并保留可复用的资料上下文
 - 支持 `@` 快捷输入和 `/` 斜杠命令调用技能
 - 支持流式响应、任务状态、对话任务通知和后台任务进度
+- 支持摘要目录导航和对话缩略图导航两种跳转方式，长对话不必一直滚
+- 支持语音输入，输入框可自定义显示附件、知识库、语音、Token 计数和耗时
+- 支持思考过程展示、Agent 步骤与工具调用可视化
 - 支持从 Agent 输出中直接查询文档、打开查询来源，并预览 HTML、图表和其他可视化产物
 
 ### 🎓 可视化学习与内容创作
@@ -175,14 +194,19 @@ Reviva 不只输出文本答案。学习工作台可以把当前对话、选中�
 | --- | --- |
 | 测验 | 生成单选、多选、判断、填空和简答题，定位薄弱知识点 |
 | 闪卡 | 将概念、公式、词汇和错题拆成可重复复习的记忆卡片 |
+| 知识卡片 | 围绕考点生成四种交互卡，支持遮挡自测、手势滑动、间隔重复轮次和进度统计 |
+| Q&A | 生成 FAQ 与思考问答，适合常见疑问和易错点整理 |
+| 术语表 | 整理专业术语与定义，形成可检索的课程术语页 |
+| 速查表 | 浓缩公式、解题步骤和易错点，复习时一页看完 |
 | 思维导图 | 把章节、课程或项目整理为层级结构 |
 | 知识图谱 | 展示概念、人物、事件和知识点之间的关系 |
 | 图表 | 生成流程图、对比图、矩阵图及其他可视化结果 |
+| 学习指南 | 生成结构化学习材料与综合摘要 |
 | PPT | 从资料、知识库或研究结果生成演示文稿 |
-| 播客 | 将长文档和课程资料改写为适合收听的播客脚本与音频 |
 | 深度研究 | 拆解问题、收集证据并生成结构化研究报告 |
+| 播客 | 将长文档和课程资料改写为适合收听的播客脚本与音频 |
 
-本地生成适合快速学习和整理；PPT、深度研究和部分云端创作能力可能需要云端模型或按量计费服务。
+13 个工具里 12 个可以本地生成，播客走云端服务。本地生成适合快速学习和整理；PPT、深度研究和部分云端创作能力可能需要云端模型或按量计费服务。创作工具在设置页可控制显示、隐藏与排序。
 
 ### 📄 文档、Office 与 OCR
 
@@ -204,8 +228,9 @@ Reviva 不只输出文本答案。学习工作台可以把当前对话、选中�
 
 ### 🤖 Agent 与扩展
 
-- 内置测验生成助手、学习教练、文期末复习助手等 Agent
-- 支持用户创建和管理自定义 Agent
+- 内置 18 个学习向 Agent：通用学习助手、概念解释器、费曼学习教练、苏格拉底导师、期末复习助手、考试模拟器、错题分析器、测验生成器、闪卡生成器、K12 数学/英语/物理/化学学习助手、计算机专业课与计算机网络学习助手、考公备考助手、教学教研助手、演示制作助手
+- 内置 61 个 Skill，覆盖学习方法、学科内容、可视化动画、创作办公和教学教研；支持用户创建、AI 生成和导入自定义 Skill
+- 支持用户创建和管理自定义 Agent，并提供 Agent 健康检查
 - 多个 Agent 可以共享知识库、文档、笔记和工具上下文
 - 每个 Agent 可以独立配置提示词、模型、Skills、工具、知识库和输出风格
 - 支持文件读取、写入、联网搜索、知识库查询等内置工具
@@ -218,17 +243,32 @@ Reviva 不只输出文本答案。学习工作台可以把当前对话、选中�
 - 支持创建多个 Wiki 知识库，按课程、论文、项目或主题组织资料
 - 上传并选择文档后，可由 Agent 自动整理和维护 Wiki 页面
 - 支持来源追溯、知识库检索和基于资料的问答
-- 支持 Markdown 笔记、文件夹、搜索、预览和 AI 辅助编辑
+- 支持 Markdown 笔记、文件夹、搜索、预览、代码块折叠和 AI 辅助编辑
+- 支持 Wiki 页面检查（Lint）与语义审计，来源可回指到原始资料
+
+### 🔌 外部知识库（KBP，Beta）
+
+Reviva 内置 **KBP（Knowledge Base Protocol）**，让 Agent 在对话时直接检索你的私有知识库。
+
+- **Dify / FastGPT**：填入 API Key 即可一键获取知识库列表
+- **MCP 服务器**：自动发现已有的检索工具，零配置
+- **自定义知识库**：粘贴 HTTP 请求/响应示例，由 AI 解析生成适配配置
+- 侧边栏可按会话选择启用检索，API Key 存储在本地
+
+> 该功能目前处于 Beta 阶段，核心场景已可用。
 
 ### ⚙️ 系统与数据
 
-- 支持浅色 / 深色主题、主题色和 Agent 语气风格设置
-- 支持配置自己的 LLM 模型，包括自有 API Key、OpenAI-compatible 服务、本地模型
+- 支持浅色 / 深色主题、7 套内置主题随意切换、自定义 CSS 主题（Beta）、主题色和 Agent 语气风格设置
+- 支持配置对话、语音（ASR）、图像生成编辑和 OCR 四类模型，覆盖自有 API Key、OpenAI-compatible、Anthropic、OpenAI Responses 协议和本地模型
+- 支持成长画像（Beta）：跨对话维护学习目标、概念掌握状态、误区与复习需求，记录可暂停、可撤销、可导出
 - 支持 Token 消耗查询、模型调用和任务状态统计可视化
 - 支持全局快捷键、任务通知和自动更新检查
+- 支持新手教程页面，引导完成工作目录、模型配置和第一轮资料对话
 - 支持检测 Pandoc、Manim、FFmpeg、OfficeCLI 等运行环境，按需安装即可
 - 支持三种数据备份：完整数据备份、精简备份、数据库备份
 - 支持统一回收站，可恢复或永久删除文档、笔记、对话等内容
+- 支持多工作区登记、切换与迁移，支持清除系统缓存和临时文件
 - 支持本地网关服务，对外提供 OpenAI Chat Completions、Responses API 等方式调用 Agent
 
 ## 产品模块
@@ -241,6 +281,7 @@ Reviva 不只输出文本答案。学习工作台可以把当前对话、选中�
 | Skills | 管理可绑定到 Agent 的内置和自定义能力模块 |
 | 工具 | 管理内置工具、自定义工具和 MCP 服务 |
 | 知识库 / Wiki | 管理知识库，沉淀课程、论文、项目和复习资料 |
+| 外部知识库 | 接入 Dify、FastGPT、MCP 或自定义 HTTP 知识库，对话时自动检索（Beta） |
 | 文档 | 管理本地资料、文件夹、Office 文档和媒体文件 |
 | 笔记 | 创建和管理 Markdown 笔记与目录 |
 | 任务 | 跟踪生成任务、媒体解析任务和学习任务 |
@@ -299,7 +340,7 @@ Reviva 不只输出文本答案。学习工作台可以把当前对话、选中�
 
 ## 项目状态
 
-Reviva 当前正式版本为 `1.3.0`，功能和界面仍在持续更新。项目主要面向 Windows 和 macOS 桌面端，建议在长期使用前做好重要数据备份。
+Reviva 当前正式版本为 `1.4.0`，功能和界面仍在持续更新。项目主要面向 Windows 和 macOS 桌面端，建议在长期使用前做好重要数据备份。
 
 遇到问题欢迎提交 [GitHub Issues](https://github.com/mingchen666/Reviva/issues)。
 
@@ -315,6 +356,10 @@ Reviva 当前正式版本为 `1.3.0`，功能和界面仍在持续更新。项�
 - [x] 对话页面导航功能
 - [x] 更完善的导入导出与备份能力
 - [x] Agent 自主学习成长闭环（长期积累用户偏好、学习画像、薄弱点，所有成长结果可审计、可撤销、可评测）目前beta
+- [x] 接入外部知识库（KBP 协议，支持 Dify / FastGPT / MCP / 自定义 HTTP）目前beta
+- [x] 新增知识卡片、学习指南、Q&A、术语表、速查表五个创作工具
+- [x] 语音输入、图像生成编辑模型配置与 7 套内置主题
+- [x] 新手教程页面与本地开放服务接入文档
 - [ ] 更多......
 
 ## 开源协议与商业授权

@@ -27,6 +27,20 @@ const lColors = { ...dColors }
 const textColors = { main: 'var(--ui-text-main)', sub: 'var(--ui-text-sub)', aux: 'var(--ui-text-aux)', dim: 'var(--ui-text-dim)' }
 
 export default defineConfig({
+  // 扫描所有源码文件但排除 node_modules：否则 dev 模式下扫描数万 node_modules 文件要 17 秒
+  content: {
+    pipeline: {
+      include: [
+        /^(?!.*[\\/]node_modules[\\/]).*\.(vue|js|ts|jsx|tsx|html)$/i,
+      ],
+    },
+    filesystem: [
+      'src/**/*.vue',
+      'src/**/*.js',
+      'src/**/*.ts',
+      'index.html',
+    ],
+  },
   preflights: [
     {
       layer: 'components',

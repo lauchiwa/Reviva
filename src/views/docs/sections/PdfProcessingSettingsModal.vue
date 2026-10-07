@@ -7,6 +7,7 @@ import {
 } from '@/apis/media';
 import {webProviderVisuals,pdfEngineOptions,uploadActionOptions,largePdfOptions,fallbackOptions,mediaActionOptions,
 mediaPresetOptions,mediaLanguageOptions} from './constant'
+import { getAliyunAsrModelTypeLabel } from '@/constants/aliyunAsrModels';
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -22,7 +23,8 @@ const props = defineProps({
   initialTab: { type: String, default: 'pdf' },
   webSettings: { type: Object, default: null },
   webProviders: { type: Array, default: () => [] },
-  configuredSpeechProviders: { type: Array, default: () => [] }
+  configuredSpeechProviders: { type: Array, default: () => [] },
+  configuredModels: { type: Array, default: () => [] }
 });
 
 const emit = defineEmits([
@@ -243,11 +245,35 @@ const speechProviderOptions = computed(() => [
     svgIcon: speechProviderIcons[provider.id] || '',
     icon: provider.icon || 'ri-mic-ai-line',
     title: provider.name,
-    desc: `${provider.model || '已配置'}${provider.active ? ' · 当前默认' : ''}`
+    desc: `${provider.modelName || provider.model || '已配置'}${provider.active ? ' · 当前默认' : ''}`
   }))
 ]);
 
 const speechProviderReady = computed(() => props.configuredSpeechProviders.length > 0);
+
+// 模型级选择：列出所有已配置模型（跨服务商），供音视频解析指定具体模型
+const mediaModelOptions = computed(() => [
+  {
+    value: 'auto',
+    icon: 'ri-route-line',
+    title: '自动选择',
+    desc: props.configuredModels.length
+      ? '优先使用已配置的默认语音模型。'
+      : '尚未配置语音模型；无字幕媒体会保持部分可用。'
+  },
+  ...props.configuredModels.filter((m) => !m.realtime).map((m) => ({
+    value: m.ref,
+    icon: 'ri-mic-ai-line',
+    title: m.modelName || m.modelId,
+    desc: `${m.providerName}${m.providerId === 'aliyun_bailian_asr' && getAliyunAsrModelTypeLabel(m.modelId) ? ' \u00b7 ' + getAliyunAsrModelTypeLabel(m.modelId) : ''}`,
+    providerId: m.providerId,
+    modelId: m.modelId,
+  }))
+]);
+
+const selectedMediaModel = computed(() =>
+  selectedOption(mediaModelOptions.value, model.value?.mediaModelRef || 'auto')
+);
 const selectedMediaProvider = computed(() =>
   selectedOption(speechProviderOptions.value, model.value?.mediaProviderId || 'auto')
 );
@@ -288,13 +314,20 @@ function toggleSelect(key) {
 
 function selectOption(field, value) {
   model.value[field] = value;
+  if (field === 'mediaModelRef') {
+    if (value && value !== 'auto') {
+      const idx = value.indexOf('::');
+      model.value.mediaProviderId = idx > 0 ? value.slice(0, idx) : value;
+    } else {
+      model.value.mediaProviderId = 'auto';
+    }
+  }
   if (field === 'mediaPreset' && value === 'keyframe_enhanced')
     model.value.mediaExtractKeyframes = true;
   if (field === 'mediaPreset' && value === 'local_private') {
-    const localProvider = props.configuredSpeechProviders.find(
-      (provider) => provider.id === 'local_asr'
-    );
-    model.value.mediaProviderId = localProvider ? 'local_asr' : 'auto';
+    const localModel = props.configuredModels.find((m) => m.providerId === 'local_asr');
+    model.value.mediaModelRef = localModel ? localModel.ref : '';
+    model.value.mediaProviderId = localModel ? 'local_asr' : 'auto';
   }
   openSelectKey.value = '';
 }
@@ -1396,33 +1429,33 @@ function toneClasses(tone) {
             <button
               type="button"
               :class="selectorButtonClasses()"
-              @click="toggleSelect('mediaProvider')"
+              @click="toggleSelect('mediaModel')"
             >
               <span class="compact-select__icon compact-select__provider-icon">
                 <SvgIcon
-                  v-if="selectedMediaProvider.svgIcon"
-                  :icon-class="selectedMediaProvider.svgIcon"
+                  v-if="selectedMediaModel.svgIcon"
+                  :icon-class="selectedMediaModel.svgIcon"
                   :size="17"
                   :color="isDark ? '#f5f5f5' : '#1f2937'"
                 />
-                <i v-else :class="selectedMediaProvider.icon" />
+                <i v-else :class="selectedMediaModel.icon" />
               </span>
               <span class="compact-select__content"
-                ><span class="compact-select__title">{{ selectedMediaProvider.title }}</span
-                ><span class="compact-select__desc">{{ selectedMediaProvider.desc }}</span></span
+                ><span class="compact-select__title">{{ selectedMediaModel.title }}</span
+                ><span class="compact-select__desc">{{ selectedMediaModel.desc }}</span></span
               >
               <i
                 class="ri-arrow-down-s-line compact-select__arrow"
-                :class="{ 'compact-select__arrow--open': openSelectKey === 'mediaProvider' }"
+                :class="{ 'compact-select__arrow--open': openSelectKey === 'mediaModel' }"
               />
             </button>
-            <div v-if="openSelectKey === 'mediaProvider'" :class="selectorMenuClasses()">
+            <div v-if="openSelectKey === 'mediaModel'" :class="selectorMenuClasses()">
               <button
-                v-for="option in speechProviderOptions"
+                v-for="option in mediaModelOptions"
                 :key="option.value"
                 type="button"
-                :class="selectorOptionClasses(model.mediaProviderId === option.value)"
-                @click="selectOption('mediaProviderId', option.value)"
+                :class="selectorOptionClasses(model.mediaModelRef === option.value)"
+                @click="selectOption('mediaModelRef', option.value)"
               >
                 <span class="compact-select__icon compact-select__provider-icon">
                   <SvgIcon
@@ -1437,7 +1470,7 @@ function toneClasses(tone) {
                   ><span class="compact-select__title">{{ option.title }}</span
                   ><span class="compact-select__desc">{{ option.desc }}</span></span
                 ><i
-                  v-if="model.mediaProviderId === option.value"
+                  v-if="model.mediaModelRef === option.value"
                   class="ri-check-line compact-select__check"
                 />
               </button>
@@ -1453,12 +1486,12 @@ function toneClasses(tone) {
           <div class="min-w-0 flex-1">
             <strong :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">{{
               speechProviderReady
-                ? `当前解析使用：${selectedMediaProvider?.title || '自动选择'}`
+                ? `当前解析使用：${selectedMediaModel?.title || '自动选择'}`
                 : '尚未配置语音转文字服务'
             }}</strong>
             <small :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">{{
               speechProviderReady
-                ? `${selectedMediaProvider?.desc || '无字幕媒体将按所选服务继续转录。'}${model.mediaProviderId === 'auto' ? ' 仅自动模式会使用默认服务商。' : ' 显式选择不会被默认服务商覆盖。'}`
+                ? `${selectedMediaModel?.desc || '无字幕媒体将按所选服务继续转录。'}${model.mediaModelRef === 'auto' || !model.mediaModelRef ? ' 仅自动模式会使用默认服务商。' : ' 显式选择不会被默认服务商覆盖。'}`
                 : '已有字幕媒体仍可正常解析；无字幕媒体会保持部分可用。'
             }}</small>
           </div>

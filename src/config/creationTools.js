@@ -1,6 +1,7 @@
 export const CREATION_TOOLS = Object.freeze([
   { id: 'quiz', name: '测验', icon: 'ri-questionnaire-line', color: 'emerald', desc: '生成练习测验' },
   { id: 'flashcard', name: '闪卡', icon: 'ri-stack-line', color: 'pink', desc: '生成学习闪卡' },
+  { id: 'studycard', name: '知识卡片', icon: 'ri-coupon-line', color: 'amber', desc: '围绕考点生成四种交互卡' },
   { id: 'qa', name: 'Q&A', icon: 'ri-question-answer-line', color: 'brand', desc: '生成 FAQ 与思考问答' },
   { id: 'glossary', name: '术语表', icon: 'ri-book-2-line', color: 'agent', desc: '整理专业术语与定义' },
   { id: 'cheatsheet', name: '速查表', icon: 'ri-file-list-3-line', color: 'amber', desc: '浓缩公式、步骤与易错点' },
@@ -9,6 +10,7 @@ export const CREATION_TOOLS = Object.freeze([
   { id: 'chart', name: '图表', icon: 'ri-bar-chart-box-line', color: 'sky', desc: '生成 SVG 图表' },
   { id: 'podcast', name: '播客', icon: 'ri-mic-2-line', color: 'agent', desc: '生成播客音频' },
   { id: 'research', name: '深度研究', icon: 'ri-search-eye-line', color: 'sky', desc: '深度研究分析' },
+  { id: 'studyguide', name: '学习指南', icon: 'ri-book-open-line', color: 'emerald', desc: '结构化学习材料与综合摘要' },
   { id: 'ppt', name: 'PPT', icon: 'ri-slideshow-line', color: 'brand', desc: '生成演示文稿' },
 ])
 

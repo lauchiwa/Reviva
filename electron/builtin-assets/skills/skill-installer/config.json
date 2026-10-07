@@ -1,14 +1,19 @@
 {
   "id": "skill-installer",
   "name": "Skill 安装助手",
-  "description": "跨平台智能安装助手：自动检测操作系统，适配 Windows/macOS/Linux 命令，处理 Git、网络、路径和压缩包问题。用于用户说“安装 skill”“帮我安装 xxx”或提供本地 skill 路径时。",
+  "description": "安装和管理 Reviva Skills。支持从 GitHub URL 克隆、本地路径或 ZIP 导入、以及从描述创建新 Skill。当用户说安装 skill、帮我安装 xxx、我下载了 skill、创建一个 skill 时触发。",
   "icon": "ri-download-cloud-2-line",
   "color": "#6C8AFF",
   "category": "学习",
   "source": "platform",
-  "allowedTools": ["kb_search", "file_read"],
-  "outputTypes": ["Markdown", "TXT"],
-  "version": "1.0",
+  "allowedTools": [
+    "skill_install"
+  ],
+  "outputTypes": [
+    "Markdown",
+    "TXT"
+  ],
+  "version": "1.0.0",
   "author": "reviva",
   "license": "MIT"
 }

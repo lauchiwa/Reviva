@@ -5,6 +5,7 @@ const now = () => Math.floor(Date.now() / 1000)
 const CREATION_CENTER_ENGLISH_NAMES = new Set([
   'quiz-generator', 'ppt-generator', 'mindmap-generator', 'graph-generator',
   'flashcard-generator', 'chart-generator', 'deep-researcher', 'lab-report-assistant',
+  'studycard-generator',
 ])
 
 function textContent(content) {

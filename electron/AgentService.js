@@ -101,7 +101,9 @@ import { ChatOpenAIResponsesCompat, normalizeAnthropicApiUrl } from './agents/ru
 import { MemorySaver, InMemoryStore, Command } from '@langchain/langgraph'
 import { HumanMessage } from '@langchain/core/messages'
 import { getLangchainTools, getUserDefinedLangchainTools, setToolProviderConfig, setWorkDirService, setDbService, setWikiService as setWikiServiceForTools, setMcpService as setMcpServiceForTools, setMediaQueryService as setMediaQueryServiceForTools, setNoteFileService as setNoteFileServiceForTools, setVisionAnalyzeHandler, resetTaskCounters, setExecCommandConfig, setCloudContext, setToolRunContext } from './agents/langchainTools.js'
+import { setSkillService as setSkillServiceForTools } from './agents/langchainTools.js'
 import { getMcpSourceAdapter } from './knowledge-source/adapters/McpSourceAdapter.js'
+import { isDestructiveCommand } from './security/SafeCommandRunner.js'
 import { setKnowledgeSourceRegistry } from './agents/langchainTools.js'
 import { KnowledgeSourceRegistry } from './knowledge-source/KnowledgeSourceRegistry.js'
 import { buildProjectSystemPrompt } from './agents/prompts/projectSystemPrompt.js'
@@ -116,6 +118,21 @@ import { buildLearningProfileSystemPrompt } from './learning-memory/learning-pro
 
 
 
+function _isSensitiveWritePath(filePath) {
+  const p = String(filePath || '').trim()
+  if (!p) return false
+  if (p.includes('..')) return true
+  if (p.startsWith('/')) {
+    const lower = p.toLowerCase()
+    // Only protect the system config directory; memory/skills are routine write targets
+    if (lower.includes('/.reviva/')) return true
+    return false
+  }
+  if (/^[A-Za-z]:[\\/]/.test(p)) return true
+  if (p.startsWith('~')) return true
+  return false
+}
+
 export class AgentService {
   constructor(dbService, getWin, workDirService, mcpService, notificationHandlers = {}, noteFileService = null) {
     this._db = dbService
@@ -126,6 +143,7 @@ export class AgentService {
     this._learningMemoryService = null
     this._mediaIngestionService = null
     this._mediaQueryService = null
+    this._skillService = null
     this._tokenRecorder = new TokenRecorder(dbService)
     this._errorClassifier = new ErrorClassifier()
     this._runStateManager = new RunStateManager(dbService)
@@ -157,6 +175,8 @@ export class AgentService {
     setNoteFileServiceForTools(this._noteFileService)
     setMcpServiceForTools(this._mcpService)
     setVisionAnalyzeHandler((args, context) => this._visionAnalyzeService.analyze(args, context))
+
+    setSkillServiceForTools(this._skillService)
 
     // Initialize KnowledgeSourceRegistry and inject into langchainTools
     this._kbRegistry = new KnowledgeSourceRegistry(this._db)
@@ -203,6 +223,11 @@ export class AgentService {
   setWikiService(wikiService) {
     this._wikiService = wikiService || null
     setWikiServiceForTools(wikiService)
+  }
+
+  setSkillService(skillService) {
+    this._skillService = skillService || null
+    setSkillServiceForTools(skillService)
   }
 
   setMediaQueryService(mediaQueryService) {
@@ -313,6 +338,7 @@ export class AgentService {
             presetId: settings.mediaPreset || 'subtitle_first',
             language: settings.mediaPreferredLanguage === 'auto' ? '' : settings.mediaPreferredLanguage,
             providerId: settings.mediaProviderId || 'auto',
+            modelRef: settings.mediaModelRef || '',
             preferSubtitle: settings.mediaPreferSubtitle !== false,
             extractKeyframes: settings.mediaExtractKeyframes === true,
             keyframeLimit: settings.mediaKeyframeLimit || 12,
@@ -414,7 +440,7 @@ export class AgentService {
 
   _createModel(providerId, apiKey, baseUrl, modelName, options = {}) {
     const common = { apiKey, model: modelName, maxRetries: 1 }
-    const timeout = options.timeout || 180000
+    const timeout = options.timeout || 300000
     if (options.temperature !== undefined) common.temperature = options.temperature
     if (options.maxTokens) common.maxTokens = options.maxTokens
     if (options.topP !== undefined) common.topP = options.topP
@@ -593,7 +619,8 @@ export class AgentService {
   }
 
   _withSkillTools(toolIds, skillIds) {
-    return [...new Set([...(toolIds || []), ...this._skillAllowedTools(skillIds)].filter(Boolean))]
+    const allSkillIds = [...this._defaultSkillIds(), ...(skillIds || [])]
+    return [...new Set([...(toolIds || []), ...this._skillAllowedTools(allSkillIds)].filter(Boolean))]
   }
 
   _buildLocalRuntimeTools(toolIds, { includeDefaults = true, modelHasVision = false, visionAvailable = modelHasVision } = {}) {
@@ -756,10 +783,16 @@ export class AgentService {
       parts.push('[任务]\n' + (topic || `请根据以下资料生成演示文稿：${fileNames || '用户选择的资料'}`))
       parts.push(`[用户配置]\n场景: ${params.scene || 'auto'}（${sceneLabel[params.scene] || '智能匹配'}）\n输出格式: ${params.format || 'html'}（${fmtLabel[params.format] || 'HTML 演示文稿'}）\n页数: ${params.pages || 12}`)
       parts.push('[产物要求]\n按实际生成结果写入输出目录。可能只有 HTML、只有 PPTX，或同时包含 HTML/PPTX/PNG，不要假设某一种文件一定存在。')
-    } else if (toolId === 'research') {
-      parts.push('[研究要求]\n' + (topic || `请对以下资料进行深度研究分析：${fileNames || '用户选择的资料'}`))
-      parts.push('[产物要求]\n同时生成 Markdown 研究报告和 HTML 可视化报告，分别写入深度研究输出目录。')
-    } else {
+   } else if (toolId === 'research') {
+     parts.push('[研究要求]\n' + (topic || `请对以下资料进行深度研究分析：${fileNames || '用户选择的资料'}`))
+     parts.push('[产物要求]\n同时生成 Markdown 研究报告和 HTML 可视化报告，分别写入深度研究输出目录。')
+    } else if (toolId === 'studyguide') {
+      const guideTypeLabel = { comprehensive: '综合指南', 'exam-cram': '考前速成', 'concept-dive': '概念解析', summary: '摘要综述' }
+      const guideType = params.guideType || 'comprehensive'
+      parts.push('[学习指南任务]\n' + (topic || `请根据以下资料生成学习指南：${fileNames || '用户选择的资料'}`))
+      parts.push(`[指南类型]\n${guideType}（${guideTypeLabel[guideType] || '综合指南'}）`)
+      parts.push('[产物要求]\n同时生成 Markdown 学习指南和 HTML 可交互学习指南，分别写入学习指南输出目录。')
+   } else {
       parts.push(topic || '请基于用户资料完成任务')
     }
 
@@ -899,10 +932,14 @@ export class AgentService {
       })
 
       onProgress(42, runtimeSubagents?.length ? `已加载 ${runtimeSubagents.length} 个子智能体` : '准备执行...')
-      const interruptOn = this._buildInterruptOn(moduleConfig.permissions)
-      this._injectSemanticMemories(workRoot)
-      const memory = this._buildMemoryPaths({ agentId: request.agentId || moduleConfig.id, agentEnglishName })
-      const normalizedRoot = (workRoot || '.').replace(/\\/g, '/')
+      const interruptOn = this._buildInterruptOn(moduleConfig.permissions, workRoot)
+     this._injectSemanticMemories(workRoot)
+     const memory = this._buildMemoryPaths({ agentId: request.agentId || moduleConfig.id, agentEnglishName })
+     // Inject memory content directly into systemPrompt to avoid deepagents MemoryMiddleware
+     // (which creates array-content SystemMessage that some model bindings don't handle correctly)
+     const memoryContent = this._readMemoryContents(workRoot, agentDirName)
+     if (memoryContent) systemPrompt += '\n\n' + memoryContent
+     const normalizedRoot = (workRoot || '.').replace(/\\/g, '/')
       const backend = new AgentScopedBackend({ rootDir: normalizedRoot, virtualMode: true }, {
         workDirService: this._workDirService,
         boundSkillIds: skillData.boundSkillIds,
@@ -917,9 +954,9 @@ export class AgentService {
         systemPrompt,
         subagents: runtimeSubagents,
         interruptOn,
-        skills: skillData.paths,
-        memory,
-        backend,
+       skills: skillData.paths,
+       // memory omitted — content injected into systemPrompt above to avoid MemoryMiddleware compatibility issue
+       backend,
         checkpointer: this._checkpointer,
         store: this._store,
         name: agentEnglishName || moduleConfig.id || 'builtin-task-agent',
@@ -962,8 +999,8 @@ export class AgentService {
         else if (chunk?.type === 'todos') bump('更新任务计划...', 1)
       }
 
-      hardTimeout = setTimeout(() => abortController.abort(), moduleConfig.hard_timeout_ms || 600000)
-      onProgress(50, '智能体执行中...')
+      hardTimeout = setTimeout(() => abortController.abort(), moduleConfig.hard_timeout_ms || 3600000)
+      onProgress(50, '任务执行中...')
       const result = await iterateDeepStream(
         agent,
         { messages: plainMessages },
@@ -1022,21 +1059,54 @@ export class AgentService {
    * Destructive or system-level tools require human approval.
    * File write/edit permissions mean the agent is already allowed to write inside the sandbox.
    */
-  _buildInterruptOn(permissions) {
+  _buildInterruptOn(permissions, workRoot = '') {
     if (!permissions) return undefined
+    // Global toggle: 'auto' (default) = no popups; 'sensitive' = destructive-only
+    const hitlMode = this._db?.getSetting?.('hitlMode') ?? 'auto'
+    if (hitlMode === 'auto') return undefined
     const interruptOn = {}
 
-    // Keep HITL only for sensitive actions. write_file/edit_file are governed by agent permissions and workspace sandboxing.
+    // Tier 2: exec_command — only interrupt when the command is destructive.
+    // Safe commands (ls, cat, git status, pnpm dev, etc.) run silently.
+    // Blacklisted commands are handled by SafeCommandRunner (hard block, no popup).
     if (permissions.execCommand) {
-      interruptOn.exec_command = { allowedDecisions: ['approve', 'reject'] }
-      interruptOn.execute = { allowedDecisions: ['approve', 'reject'] }
+      const whenExec = (request) => {
+        const args = request?.toolCall?.args || {}
+        const commandStr = args.command
+          || [args.cmd, ...(Array.isArray(args.args) ? args.args : [])].filter(Boolean).join(' ')
+        if (!commandStr) return false
+        return isDestructiveCommand(commandStr)
+      }
+      interruptOn.exec_command = { allowedDecisions: ['approve', 'reject'], when: whenExec }
+      interruptOn.execute = { allowedDecisions: ['approve', 'reject'], when: whenExec }
       for (const name of HIDDEN_COMMAND_COMPATIBILITY_TOOL_NAMES) {
-        interruptOn[name] = { allowedDecisions: ['approve', 'reject'] }
+        interruptOn[name] = { allowedDecisions: ['approve', 'reject'], when: whenExec }
       }
     }
+
+    // Tier 1: delete_file — irreversible, always interrupt (no when predicate).
     if (permissions.fileDelete) interruptOn.delete_file = { allowedDecisions: ['approve', 'reject'] }
 
+    // Tier 2: write_file / edit_file — only interrupt when the target path is
+    // outside the workspace root or inside a protected system directory.
+    interruptOn.write_file = {
+      allowedDecisions: ['approve', 'reject'],
+      when: (request) => _isSensitiveWritePath(request?.toolCall?.args?.file_path || request?.toolCall?.args?.path),
+    }
+    interruptOn.edit_file = {
+      allowedDecisions: ['approve', 'reject'],
+      when: (request) => _isSensitiveWritePath(request?.toolCall?.args?.file_path || request?.toolCall?.args?.path),
+    }
+
     return Object.keys(interruptOn).length ? interruptOn : undefined
+  }
+
+  /**
+   * Skill IDs that are always bound to every agent, regardless of agent config.
+   * These skills are installed as builtins and provide foundational capabilities.
+   */
+  _defaultSkillIds() {
+    return ['skill-installer']
   }
 
   /**
@@ -1046,7 +1116,11 @@ export class AgentService {
    * Returns { paths: string[], info: { id, name, desc }[], boundSkillIds: string[] }
    */
   _buildSkillsPaths(skillIds) {
-    const normalizedSkillIds = [...new Set((skillIds || []).map(id => this._normalizeSkillId(id)).filter(Boolean))]
+    const defaultIds = this._defaultSkillIds()
+    const normalizedSkillIds = [...new Set([
+      ...defaultIds,
+      ...(skillIds || []).map(id => this._normalizeSkillId(id)),
+    ].filter(Boolean))]
     if (!normalizedSkillIds.length) return { paths: undefined, info: [], boundSkillIds: [] }
     const workRoot = this._workDirService?.getRootPath?.() || ''
     if (!workRoot) return { paths: undefined, info: [], boundSkillIds: [] }
@@ -1138,6 +1212,27 @@ export class AgentService {
     ]
 
     return paths
+  }
+
+  // Read AGENTS.md memory files and return as a string for system prompt injection.
+  // Replaces deepagents MemoryMiddleware which creates array-content SystemMessage
+  // that some model bindings fail to convert to AIMessage.
+  _readMemoryContents(workRoot, agentDirName) {
+    if (!workRoot || !agentDirName) return ''
+    const files = [
+      path.join(workRoot, 'memories', 'AGENTS.md'),
+      path.join(workRoot, 'agents', agentDirName, 'memory', 'AGENTS.md'),
+    ]
+    const sections = []
+    for (const p of files) {
+      try {
+        if (fs.existsSync(p)) {
+          const content = fs.readFileSync(p, 'utf-8').trim()
+          if (content) sections.push(content)
+        }
+      } catch { /* ignore read errors */ }
+    }
+    return sections.length ? `## Agent Memory\n\n${sections.join('\n\n---\n\n')}` : ''
   }
 
   // ── Memory Injection: DB semantic memories → AGENTS.md ──────────
@@ -1334,16 +1429,19 @@ export class AgentService {
       console.log('[AgentService] Subagents:', runtimeSubagents?.map(s => s.name) || 'none')
 
       // Build interruptOn from permissions
-      const interruptOn = this._buildInterruptOn(request.permissions)
+      const interruptOn = this._buildInterruptOn(request.permissions, workRoot)
       console.log('[AgentService] InterruptOn:', interruptOn || 'none')
 
       // Inject DB semantic memories into global AGENTS.md
       this._injectSemanticMemories(workRoot)
 
-      // Build memory paths (per-agent isolated)
-      const memory = this._buildMemoryPaths({ agentId: request.agentId, agentEnglishName: request.agentEnglishName })
+     // Build memory paths (per-agent isolated)
+     const memory = this._buildMemoryPaths({ agentId: request.agentId, agentEnglishName: request.agentEnglishName })
+     // Inject memory content directly into systemPrompt (same approach as runBuiltinTask)
+     const memoryContent = this._readMemoryContents(workRoot, agentDirName)
+     if (memoryContent) systemPrompt += '\n\n' + memoryContent
 
-      // Build backend: AgentScopedBackend restricts file tools by VFS policy.
+     // Build backend: AgentScopedBackend restricts file tools by VFS policy.
       // DeepAgents expects POSIX-style rootDir (forward slashes) for virtualMode path resolution
       const normalizedRoot = (workRoot || '.').replace(/\\/g, '/')
       const backend = new AgentScopedBackend({ rootDir: normalizedRoot, virtualMode: true }, {
@@ -1362,12 +1460,12 @@ export class AgentService {
         systemPrompt,
         subagents: runtimeSubagents,
         interruptOn,
-        skills: skillData.paths,
-        memory,
-        backend,
-        checkpointer: this._checkpointer,
-        store: this._store,
-        name: request.agentEnglishName || request.agentId || 'reviva-agent',
+       skills: skillData.paths,
+       // memory omitted — content injected into systemPrompt above
+       backend,
+       checkpointer: this._checkpointer,
+       store: this._store,
+       name: request.agentEnglishName || request.agentId || 'reviva-agent',
         middleware: buildMiddleware({
           toolCallLimit: request.toolCallLimit,
           modelCallLimit: request.modelCallLimit,
@@ -1386,9 +1484,8 @@ export class AgentService {
         { modelHasVision: !!request.modelHasVision },
       ))
 
-      // Hard timeout — document/research generation agents get 10min, others 5min
-      const longRunningAgents = new Set(['deep-researcher', 'lab-report-assistant'])
-      const timeoutMs = longRunningAgents.has(request.agentEnglishName) ? 600000 : 300000
+      // Hard timeout — all agents get 1 hour
+      const timeoutMs = 3600000
       const hardTimeout = setTimeout(() => abortController.abort(), timeoutMs)
 
       const sendFn = (chunk) => this._send('agent:chunk', { runId, chunk })
@@ -1428,7 +1525,7 @@ export class AgentService {
             this._interruptedRuns.set(runId, {
               runId,
               request,
-              agentConfig: { model, tools: rootTools, toolIds: effectiveToolIds, systemPrompt, subagents: runtimeSubagents, interruptOn, skills: skillData.paths, boundSkillIds: skillData.boundSkillIds, memory, memoryDirName, agentDirName },
+             agentConfig: { model, tools: rootTools, toolIds: effectiveToolIds, systemPrompt, subagents: runtimeSubagents, interruptOn, skills: skillData.paths, boundSkillIds: skillData.boundSkillIds, memoryDirName, agentDirName },
               msgId,
               initialSteps: result.steps,
               initialIteration: result.iteration,
@@ -1466,7 +1563,7 @@ export class AgentService {
           this._interruptedRuns.set(runId, {
             runId,
             request,
-            agentConfig: { model, tools: rootTools, systemPrompt, subagents: runtimeSubagents, interruptOn, skills: skillData.paths, boundSkillIds: skillData.boundSkillIds, memory, memoryDirName, agentDirName },
+            agentConfig: { model, tools: rootTools, systemPrompt, subagents: runtimeSubagents, interruptOn, skills: skillData.paths, boundSkillIds: skillData.boundSkillIds, memoryDirName, agentDirName },
             msgId,
             initialSteps: result.steps,
             initialIteration: result.iteration,
@@ -1676,7 +1773,7 @@ export class AgentService {
         subagents: agentConfig.subagents,
         interruptOn: agentConfig.interruptOn,
         skills: agentConfig.skills,
-        memory: agentConfig.memory,
+        // memory omitted — content injected into systemPrompt
         backend,
         checkpointer: this._checkpointer,
         store: this._store,
@@ -2348,6 +2445,11 @@ export class AgentService {
 
       // Match file pattern from rules
       const pattern = rules?.file_patterns?.find(p => p.ext === ext)
+      // 只注册 artifact-rules.json 中声明过的扩展名，未声明的（如 .txt 探针文件）直接跳过
+      // 仅在已声明 file_patterns 时严格过滤，无规则时保留旧行为
+      if (rules?.file_patterns?.length && !pattern) continue
+      // 跳过模型自写的探针文件（test.txt / test.html 等）
+      if (title.toLowerCase() === 'test') continue
       const icon = pattern?.icon || (ext === 'html' ? 'ri-bar-chart-box-line' : 'ri-file-text-line')
       const type = pattern?.type || 'research'
 

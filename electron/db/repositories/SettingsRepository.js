@@ -3,12 +3,14 @@ import { parseJSON, stringifyJSON } from '../helpers.js'
 import { BaseRepository } from './BaseRepository.js'
 import { ModelProviderRepository } from './ModelProviderRepository.js'
 import { SpeechProviderRepository } from './SpeechProviderRepository.js'
+import { ImageProviderRepository } from './ImageProviderRepository.js'
 
 export class SettingsRepository extends BaseRepository {
   constructor(context) {
     super(context)
     this._modelProviders = new ModelProviderRepository(context)
     this._speechProviders = new SpeechProviderRepository(context)
+    this._imageProviders = new ImageProviderRepository(context)
   }
 
   getSetting(key) {
@@ -17,6 +19,9 @@ export class SettingsRepository extends BaseRepository {
     }
     if (key === 'mediaSpeechSettings' && this._speechProviders.isAvailable('stt')) {
       return this._speechProviders.getSttSettings()
+    }
+    if (key === 'imageModels' && this._imageProviders.isAvailable()) {
+      return this._imageProviders.listProviders()
     }
     const row = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key)
     return row ? parseJSON(row.value) : null
@@ -31,6 +36,10 @@ export class SettingsRepository extends BaseRepository {
       this._speechProviders.replaceSttSettings(value)
       return { success: true }
     }
+    if (key === 'imageModels' && this._imageProviders.isAvailable()) {
+      this._imageProviders.replaceProviders(value)
+      return { success: true }
+    }
     this.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, stringifyJSON(value))
     return { success: true }
   }
@@ -41,6 +50,7 @@ export class SettingsRepository extends BaseRepository {
     for (const row of rows) result[row.key] = parseJSON(row.value)
     if (this._modelProviders.isAvailable()) result.providers = this._modelProviders.listProviders()
     if (this._speechProviders.isAvailable('stt')) result.mediaSpeechSettings = this._speechProviders.getSttSettings()
+    if (this._imageProviders.isAvailable()) result.imageModels = this._imageProviders.listProviders()
     return result
   }
 
@@ -56,6 +66,8 @@ export class SettingsRepository extends BaseRepository {
           this._modelProviders.replaceProviders(value)
         } else if (key === 'mediaSpeechSettings' && this._speechProviders.isAvailable('stt')) {
           this._speechProviders.replaceSttSettings(value)
+        } else if (key === 'imageModels' && this._imageProviders.isAvailable()) {
+          this._imageProviders.replaceProviders(value)
         } else {
           statement.run(key, serializeTransferredSetting(value))
         }

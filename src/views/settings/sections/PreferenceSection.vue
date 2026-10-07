@@ -33,6 +33,7 @@ const previewTexts = {
 const currentStyleKey = computed(() => styleLabels[ss.answerStyle] ? ss.answerStyle : 'default')
 const currentPreview = computed(() => previewTexts[currentStyleKey.value] || previewTexts.default)
 const chatNavigationEnabled = computed(() => ss.chatNavigationEnabled !== false)
+const hitlMode = computed(() => ss.hitlMode || 'auto')
 const navigationStyles = [
   {
     key: 'directory',
@@ -52,6 +53,13 @@ const navigationStyles = [
   },
 ]
 const currentNavigationStyle = computed(() => ss.chatNavigationStyle === 'minimap' ? 'minimap' : 'directory')
+
+const showAttach = computed(() => ss.chatToolbarAttach !== false)
+const showWiki = computed(() => ss.chatToolbarWiki !== false)
+const showContext = computed(() => ss.chatToolbarContext !== false)
+const showVoice = computed(() => ss.chatToolbarVoice !== false)
+const showTokenCounter = computed(() => ss.chatToolbarTokenCounter !== false)
+const showLatency = computed(() => ss.chatToolbarLatency !== false)
 </script>
 
 <template>
@@ -98,15 +106,15 @@ const currentNavigationStyle = computed(() => ss.chatNavigationStyle === 'minima
       <div class="rounded-xl overflow-hidden border" :class="isDark ? 'border-d4 bg-d3' : 'border-bdrF bg-l3'">
         <!-- 开关行 -->
         <div class="flex items-center gap-3 px-4 py-3.5 border-b" :class="isDark ? 'border-d4' : 'border-bdrF'">
-          <span class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" :class="chatNavigationEnabled ? (isDark ? 'bg-brand-400/14 text-brand-300' : 'bg-brand-50 text-brand-600') : (isDark ? 'bg-d0 text-wt-dim' : 'bg-l2 text-lt-aux')">
-            <i class="ri-navigation-line text-[17px]" />
+          <span class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" :class="chatNavigationEnabled ? (isDark ? 'bg-brand-400/14 text-brand-300' : 'bg-brand-50 text-brand-600') : (isDark ? 'bg-d0 text-wt-dim' : 'bg-l2 text-lt-aux')">
+            <i class="ri-navigation-line text-[24px]" />
           </span>
           <span class="min-w-0 flex-1">
             <span class="flex items-center gap-1.5 text-[12.5px] font-semibold" :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">
               启用对话导航
               <span class="px-1.5 py-0.5 rounded text-[9px] font-medium" :class="chatNavigationEnabled ? (isDark ? 'bg-brand-400/12 text-brand-300' : 'bg-brand-50 text-brand-600') : (isDark ? 'bg-d0 text-wt-dim' : 'bg-l2 text-lt-aux')">{{ chatNavigationEnabled ? '已开启' : '已关闭' }}</span>
             </span>
-            <span class="block mt-0.5 text-[10.5px] leading-relaxed" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">{{ chatNavigationEnabled ? '在聊天区右侧提供问答定位；不会改变 Agent 的上下文或消息内容。' : '聊天区不会显示目录或缩略图；你选择的样式会被保留。' }}</span>
+            <span class="block mt-0.5 text-[10.5px] leading-relaxed" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">{{ chatNavigationEnabled ? '在对话区域右侧提供问答定位；不会改变 Agent 的上下文或消息内容。' : '对话区域不会显示目录或缩略图；你选择的样式会被保留。' }}</span>
           </span>
           <button
             type="button"
@@ -143,7 +151,7 @@ const currentNavigationStyle = computed(() => ss.chatNavigationStyle === 'minima
                   :class="currentNavigationStyle === 'directory'
                     ? (isDark ? 'bg-brand-400/15 text-brand-300' : 'bg-brand-100 text-brand-600')
                     : (isDark ? 'bg-d0 text-wt-aux' : 'bg-l2 text-lt-aux')">
-                  <i class="ri-list-unordered text-[16px]" />
+                  <i class="ri-list-unordered text-[20px]" />
                 </span>
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-1.5">
@@ -183,7 +191,7 @@ const currentNavigationStyle = computed(() => ss.chatNavigationStyle === 'minima
                   :class="currentNavigationStyle === 'minimap'
                     ? (isDark ? 'bg-brand-400/15 text-brand-300' : 'bg-brand-100 text-brand-600')
                     : (isDark ? 'bg-d0 text-wt-aux' : 'bg-l2 text-lt-aux')">
-                  <i class="ri-code-view text-[16px]" />
+                  <i class="ri-code-view text-[20px]" />
                 </span>
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-1.5">
@@ -212,5 +220,149 @@ const currentNavigationStyle = computed(() => ss.chatNavigationStyle === 'minima
         </div>
       </div>
     </section>
+    <!-- ======== Chat Toolbar ======== -->
+    <section>
+      <div class="flex items-center gap-2 mb-4">
+        <div class="w-1 h-4 rounded-full bg-indigo-400" />
+        <span class="text-[14px] font-bold" :class="isDark ? 'text-wt-main' : 'text-lt-main'">对话输入框</span>
+        <span class="text-[10px] ml-1" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">自定义输入框底部工具按钮的显示</span>
+      </div>
+
+      <div class="rounded-xl overflow-hidden border" :class="isDark ? 'border-d4 bg-d3' : 'border-bdrF bg-l3'">
+        <!-- 附件 toggle -->
+        <div class="flex items-center gap-3 px-4 py-3.5" :class="isDark ? 'border-d4' : 'border-bdrF'">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" :class="showAttach ? (isDark ? 'bg-brand-400/14 text-brand-300' : 'bg-brand-50 text-brand-600') : (isDark ? 'bg-d0 text-wt-dim' : 'bg-l2 text-lt-aux')">
+            <i class="ri-attachment-line text-[17px]" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="text-[12.5px] font-semibold" :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">附件</span>
+            <span class="block mt-0.5 text-[10.5px] leading-relaxed" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">添加文件、图片等作为对话上下文</span>
+          </span>
+          <button type="button" role="switch" :aria-checked="showAttach" aria-label="附件" :title="(showAttach ? '隐藏' : '显示')" class="w-10 h-6 rounded-full p-0.5 shrink-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/70 focus-visible:ring-offset-2" :class="showAttach ? 'bg-brand-500' : (isDark ? 'bg-d0 border border-d4' : 'bg-l4 border border-bdrF')" @click="ss.savePreference('chatToolbarAttach', !showAttach)">
+            <span class="block w-5 h-5 rounded-full bg-white shadow-sm transition-transform" :class="showAttach ? 'translate-x-4' : 'translate-x-0'" />
+          </button>
+        </div>
+        <!-- Wiki 知识库 toggle -->
+        <div class="flex items-center gap-3 px-4 py-3.5" :class="isDark ? 'border-d4' : 'border-bdrF'">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" :class="showWiki ? (isDark ? 'bg-brand-400/14 text-brand-300' : 'bg-brand-50 text-brand-600') : (isDark ? 'bg-d0 text-wt-dim' : 'bg-l2 text-lt-aux')">
+            <i class="ri-book-2-line text-[17px]" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="text-[12.5px] font-semibold" :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">Wiki 知识库</span>
+            <span class="block mt-0.5 text-[10.5px] leading-relaxed" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">选择知识库为对话提供参考资料</span>
+          </span>
+          <button type="button" role="switch" :aria-checked="showWiki" aria-label="Wiki 知识库" :title="(showWiki ? '隐藏' : '显示')" class="w-10 h-6 rounded-full p-0.5 shrink-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/70 focus-visible:ring-offset-2" :class="showWiki ? 'bg-brand-500' : (isDark ? 'bg-d0 border border-d4' : 'bg-l4 border border-bdrF')" @click="ss.savePreference('chatToolbarWiki', !showWiki)">
+            <span class="block w-5 h-5 rounded-full bg-white shadow-sm transition-transform" :class="showWiki ? 'translate-x-4' : 'translate-x-0'" />
+          </button>
+        </div>
+        <!-- 上下文 toggle -->
+        <div class="flex items-center gap-3 px-4 py-3.5" :class="isDark ? 'border-d4' : 'border-bdrF'">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" :class="showContext ? (isDark ? 'bg-brand-400/14 text-brand-300' : 'bg-brand-50 text-brand-600') : (isDark ? 'bg-d0 text-wt-dim' : 'bg-l2 text-lt-aux')">
+            <i class="ri-text-wrap text-[17px]" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="text-[12.5px] font-semibold" :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">上下文</span>
+            <span class="block mt-0.5 text-[10.5px] leading-relaxed" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">管理上下文长度与压缩</span>
+          </span>
+          <button type="button" role="switch" :aria-checked="showContext" aria-label="上下文" :title="(showContext ? '隐藏' : '显示')" class="w-10 h-6 rounded-full p-0.5 shrink-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/70 focus-visible:ring-offset-2" :class="showContext ? 'bg-brand-500' : (isDark ? 'bg-d0 border border-d4' : 'bg-l4 border border-bdrF')" @click="ss.savePreference('chatToolbarContext', !showContext)">
+            <span class="block w-5 h-5 rounded-full bg-white shadow-sm transition-transform" :class="showContext ? 'translate-x-4' : 'translate-x-0'" />
+          </button>
+        </div>
+        <!-- 语音输入 toggle -->
+        <div class="flex items-center gap-3 px-4 py-3.5" :class="isDark ? 'border-d4' : 'border-bdrF'">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" :class="showVoice ? (isDark ? 'bg-brand-400/14 text-brand-300' : 'bg-brand-50 text-brand-600') : (isDark ? 'bg-d0 text-wt-dim' : 'bg-l2 text-lt-aux')">
+            <i class="ri-mic-line text-[17px]" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="text-[12.5px] font-semibold" :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">语音输入</span>
+            <span class="block mt-0.5 text-[10.5px] leading-relaxed" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">语音转文字输入消息</span>
+          </span>
+          <button type="button" role="switch" :aria-checked="showVoice" aria-label="语音输入" :title="(showVoice ? '隐藏' : '显示')" class="w-10 h-6 rounded-full p-0.5 shrink-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/70 focus-visible:ring-offset-2" :class="showVoice ? 'bg-brand-500' : (isDark ? 'bg-d0 border border-d4' : 'bg-l4 border border-bdrF')" @click="ss.savePreference('chatToolbarVoice', !showVoice)">
+            <span class="block w-5 h-5 rounded-full bg-white shadow-sm transition-transform" :class="showVoice ? 'translate-x-4' : 'translate-x-0'" />
+          </button>
+        </div>
+        <!-- Token 计数器 toggle -->
+        <div class="flex items-center gap-3 px-4 py-3.5">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" :class="showTokenCounter ? (isDark ? 'bg-brand-400/14 text-brand-300' : 'bg-brand-50 text-brand-600') : (isDark ? 'bg-d0 text-wt-dim' : 'bg-l2 text-lt-aux')">
+            <i class="ri-coin-line text-[17px]" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="text-[12.5px] font-semibold" :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">Token 计数器</span>
+            <span class="block mt-0.5 text-[10.5px] leading-relaxed" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">显示输入/输出 Token 用量</span>
+          </span>
+          <button type="button" role="switch" :aria-checked="showTokenCounter" aria-label="Token 计数器" :title="(showTokenCounter ? '隐藏' : '显示')" class="w-10 h-6 rounded-full p-0.5 shrink-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/70 focus-visible:ring-offset-2" :class="showTokenCounter ? 'bg-brand-500' : (isDark ? 'bg-d0 border border-d4' : 'bg-l4 border border-bdrF')" @click="ss.savePreference('chatToolbarTokenCounter', !showTokenCounter)">
+            <span class="block w-5 h-5 rounded-full bg-white shadow-sm transition-transform" :class="showTokenCounter ? 'translate-x-4' : 'translate-x-0'" />
+          </button>
+        </div>
+        <!-- 消耗时间 toggle -->
+        <div class="flex items-center gap-3 px-4 py-3.5">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" :class="showLatency ? (isDark ? 'bg-brand-400/14 text-brand-300' : 'bg-brand-50 text-brand-600') : (isDark ? 'bg-d0 text-wt-dim' : 'bg-l2 text-lt-aux')">
+            <i class="ri-timer-line text-[17px]" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="text-[12.5px] font-semibold" :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">消耗时间</span>
+            <span class="block mt-0.5 text-[10.5px] leading-relaxed" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">显示每次回复的耗时</span>
+          </span>
+          <button type="button" role="switch" :aria-checked="showLatency" aria-label="消耗时间" :title="(showLatency ? '隐藏' : '显示')" class="w-10 h-6 rounded-full p-0.5 shrink-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/70 focus-visible:ring-offset-2" :class="showLatency ? 'bg-brand-500' : (isDark ? 'bg-d0 border border-d4' : 'bg-l4 border border-bdrF')" @click="ss.savePreference('chatToolbarLatency', !showLatency)">
+            <span class="block w-5 h-5 rounded-full bg-white shadow-sm transition-transform" :class="showLatency ? 'translate-x-4' : 'translate-x-0'" />
+          </button>
+        </div>
+
+      </div>
+    </section>
+<!-- ======= 工具审批 ======= -->
+    <section>
+      <div class="flex items-center gap-2 mb-4">
+        <div class="w-1 h-4 rounded-full bg-brand-400" />
+        <span class="text-[14px] font-bold" :class="isDark ? 'text-wt-main' : 'text-lt-main'">工具审批</span>
+        <span class="text-[10px] ml-1" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">Agent 执行操作时是否需要确认</span>
+      </div>
+
+      <div class="rounded-xl overflow-hidden border" :class="isDark ? 'border-d4 bg-d3' : 'border-bdrF bg-l3'">
+        <div class="flex items-center gap-3 px-4 py-3.5 border-b" :class="isDark ? 'border-d4' : 'border-bdrF'">
+          <span class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" :class="hitlMode === 'sensitive' ? (isDark ? 'bg-brand-400/14 text-brand-300' : 'bg-brand-50 text-brand-600') : (isDark ? 'bg-d0 text-wt-dim' : 'bg-l2 text-lt-aux')">
+            <i class="ri-shield-check-line text-[24px]" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="flex items-center gap-1.5 text-[12.5px] font-semibold" :class="isDark ? 'text-wt-sub' : 'text-lt-sub'">
+              审批策略
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-medium" :class="hitlMode === 'sensitive' ? (isDark ? 'bg-brand-400/12 text-brand-300' : 'bg-brand-50 text-brand-600') : (isDark ? 'bg-d0 text-wt-dim' : 'bg-l2 text-lt-aux')">{{ hitlMode === 'sensitive' ? '询问审批' : '自动审批' }}</span>
+            </span>
+            <span class="block mt-0.5 text-[10.5px] leading-relaxed" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">{{ hitlMode === 'sensitive' ? '仅破坏性操作（rm -rf、git push --force、npm publish 等）需确认，其余静默执行。' : '全部自动执行，不弹窗。适合信任 Agent 的场景。' }}</span>
+          </span>
+        </div>
+
+        <div class="flex p-2 gap-2">
+          <button
+            type="button"
+            class="flex-1 flex items-center gap-2 py-2 px-3 rounded-lg text-left transition-all"
+            :class="hitlMode === 'auto' ? (isDark ? 'bg-agent-400/8 border border-agent-400/20' : 'bg-agent-50 border border-agent-100') : (isDark ? 'border border-transparent hover:border-d4 hover:bg-white/2' : 'border border-transparent hover:border-bdrF hover:bg-l4/50')"
+            @click="ss.savePreference('hitlMode', 'auto')"
+          >
+            <i class="ri-flashlight-line text-[16px]" :class="hitlMode === 'auto' ? (isDark ? 'text-agent-400' : 'text-agent-500') : (isDark ? 'text-wt-dim' : 'text-lt-aux')" />
+            <div class="flex-1 min-w-0">
+              <div class="text-[12px] font-semibold" :class="hitlMode === 'auto' ? (isDark ? 'text-agent-400' : 'text-agent-500') : (isDark ? 'text-wt-sub' : 'text-lt-sub')">自动审批</div>
+              <div class="text-[10px] leading-snug" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">全部静默执行，不弹窗</div>
+            </div>
+            <div v-if="hitlMode === 'auto'" class="w-2 h-2 rounded-full bg-agent-400 shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            class="flex-1 flex items-center gap-2 py-2 px-3 rounded-lg text-left transition-all"
+            :class="hitlMode === 'sensitive' ? (isDark ? 'bg-brand-400/8 border border-brand-400/20' : 'bg-brand-50 border border-brand-100') : (isDark ? 'border border-transparent hover:border-d4 hover:bg-white/2' : 'border border-transparent hover:border-bdrF hover:bg-l4/50')"
+            @click="ss.savePreference('hitlMode', 'sensitive')"
+          >
+            <i class="ri-shield-check-line text-[16px]" :class="hitlMode === 'sensitive' ? (isDark ? 'text-brand-300' : 'text-brand-600') : (isDark ? 'text-wt-dim' : 'text-lt-aux')" />
+            <div class="flex-1 min-w-0">
+              <div class="text-[12px] font-semibold" :class="hitlMode === 'sensitive' ? (isDark ? 'text-brand-300' : 'text-brand-600') : (isDark ? 'text-wt-sub' : 'text-lt-sub')">询问审批</div>
+              <div class="text-[10px] leading-snug" :class="isDark ? 'text-wt-dim' : 'text-lt-aux'">破坏性操作弹窗，其余自动</div>
+            </div>
+            <div v-if="hitlMode === 'sensitive'" class="w-2 h-2 rounded-full bg-brand-400 shrink-0" />
+          </button>
+        </div>
+      </div>
+    </section>
+
   </div>
 </template>

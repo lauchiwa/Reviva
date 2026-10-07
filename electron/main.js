@@ -43,6 +43,7 @@ import { registerGatewayIpcHandlers } from './local-gateway/ipc/gatewayIpcHandle
 import path from 'node:path'
 import fs from 'node:fs'
 import { initAutoUpdater } from './AutoUpdater'
+import { registerRealtimeASRHandlers, cleanupRealtimeASRForSender } from './RealtimeASRService.js'
 // Register reviva-file:// as a privileged scheme BEFORE app is ready so <img>/<audio>/<video> can load
 // local files (range-request capable, CORS-enabled). Renderer uses helper toFileUrl(absPath) to build URLs.
 protocol.registerSchemesAsPrivileged([
@@ -268,6 +269,7 @@ function createWindow() {
   })
 
   win.on('closed', () => {
+    cleanupRealtimeASRForSender(win.webContents)
     win = null
   })
 
@@ -3397,11 +3399,13 @@ app.whenReady().then(async () => {
   agentService.setLearningMemoryService(learningMemoryService)
   registerLearningMemoryIpcHandlers(learningMemoryService)
 
-  skillService = new SkillService(workDirService, {
-    builtinSkillsDir: app.isPackaged
-      ? path.join(process.resourcesPath, 'builtin-assets', 'skills')
-      : path.join(process.env.APP_ROOT, 'electron', 'builtin-assets', 'skills'),
-  })
+ skillService = new SkillService(workDirService, {
+   builtinSkillsDir: app.isPackaged
+     ? path.join(process.resourcesPath, 'builtin-assets', 'skills')
+     : path.join(process.env.APP_ROOT, 'electron', 'builtin-assets', 'skills'),
+ })
+
+  agentService.setSkillService(skillService)
 
   agentHealthService = new AgentHealthService(dbService, skillService)
 
@@ -3486,6 +3490,7 @@ app.whenReady().then(async () => {
     mediaLifecycle: mediaModule?.lifecycle,
     learningMemory: learningMemoryService,
   })
+  registerRealtimeASRHandlers(ipcMain)
   createWindow()
   initAutoUpdater(win)
   if (VITE_DEV_SERVER_URL) {

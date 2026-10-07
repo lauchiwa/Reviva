@@ -371,6 +371,19 @@ const DEFAULT_PROVIDERS = [
       providerModel('qwen2.5:7b', 'Qwen2.5 7B', { ctx: '128k', tier: 'balanced', enabled: false, costInput: 0, costOutput: 0 }),
     ],
   }),
+  providerPreset({
+    id: 'customapi',
+    name: '自定义服务商',
+    desc: '任意 OpenAI 兼容或 Anthropic 兼容 API；填写 Base URL 和 API Key 后手动添加模型',
+    iconName: '',
+    logoBg: '#6366f1',
+    logoChar: '自',
+    baseUrl: '',
+    enabled: false,
+    apiFormat: 'openai',
+    region: '自定义',
+    models: [],
+  }),
 
 ]
 
@@ -611,6 +624,14 @@ export const useSettingsStore = defineStore('settings', () => {
  const chatNavigationStyle = ref('directory')
  const kbMode = ref('external') // 'external' | 'cloud' — 对话默认使用的知识库类型
 
+  // Chat Toolbar Visibility - Agent selector and clear button are always visible
+  const chatToolbarAttach = ref(true)
+  const chatToolbarWiki = ref(true)
+  const chatToolbarContext = ref(true)
+  const chatToolbarVoice = ref(true)
+  const chatToolbarTokenCounter = ref(true)
+  const chatToolbarLatency = ref(true)
+
   // ─── Network ───
   const proxyMode = ref('system')
   const proxyType = ref('http')
@@ -634,6 +655,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const allowFileDelete = ref(true)
   const deleteScope = ref('outputs-only')
   const allowExecCommand = ref(false)
+  const hitlMode = ref('auto') // 'auto' = no popups; 'sensitive' = destructive-only
   const legacyDefaultCommandWhitelist = ['echo', 'where', 'which', 'whoami', 'hostname', 'ver', 'uname', 'pwd', 'dir', 'tree', 'ls', 'type', 'more', 'cat', 'findstr', 'grep', 'fc', 'diff', 'ipconfig', 'ifconfig', 'ping', 'nslookup', 'dig']
   const legacyRuntimeCommandWhitelist = ['echo', 'where', 'which', 'whoami', 'hostname', 'ver', 'uname', 'pwd', 'dir', 'tree', 'python', 'node', 'ls', 'type', 'more', 'cat', 'findstr', 'grep', 'fc', 'diff', 'ipconfig', 'ifconfig', 'ping', 'nslookup', 'dig']
   const defaultCommandWhitelist = ['echo', 'where', 'which', 'whoami', 'hostname', 'ver', 'uname', 'pwd', 'dir', 'tree', 'python', 'python3', 'py', 'node', 'pip', 'pip3', 'ls', 'type', 'more', 'cat', 'findstr', 'grep', 'fc', 'diff', 'ipconfig', 'ifconfig', 'ping', 'nslookup', 'dig']
@@ -1032,8 +1054,10 @@ export const useSettingsStore = defineStore('settings', () => {
       themeId, themeMode, accentColor, customAccentHex, fontSize,
       langPref, animations, reducedMotion, answerStyle, conflictStrategy, quickInputEnabled, creationToolPreferences, agentSkillsPanelEnabled, chatNavigationEnabled, chatNavigationStyle,
       kbMode,
+      chatToolbarAttach, chatToolbarWiki, chatToolbarContext, chatToolbarVoice, chatToolbarTokenCounter,
+      chatToolbarLatency,
       proxyMode, proxyType, proxyHost, proxyPort, proxyAuth, proxyUser, proxyPass, wikiWebResearchSettings,
-      maxIter, maxTaskMin, searchLimit, fileOpLimit, toolCallLimit, modelCallLimit, loopGuard, auditDays, pathRedact, allowFileDelete, deleteScope, allowExecCommand, commandWhitelist, commandBlacklist,
+      maxIter, maxTaskMin, searchLimit, fileOpLimit, toolCallLimit, modelCallLimit, loopGuard, auditDays, pathRedact, allowFileDelete, deleteScope, allowExecCommand, hitlMode, commandWhitelist, commandBlacklist,
       notifyTaskDone, notifyTaskFailed, notifySound, notifySoundType, notifyDND,
       autoStart, minimizeToTray, trayIcon, singleInstance,
     }
@@ -1125,6 +1149,12 @@ export const useSettingsStore = defineStore('settings', () => {
       chatNavigationEnabled.value = all.chatNavigationEnabled !== false
      chatNavigationStyle.value = _sanitizeChatNavigationStyle(all.chatNavigationStyle)
      kbMode.value = all.kbMode === 'cloud' ? 'cloud' : 'external'
+      chatToolbarAttach.value = all.chatToolbarAttach !== false
+      chatToolbarWiki.value = all.chatToolbarWiki !== false
+      chatToolbarContext.value = all.chatToolbarContext !== false
+      chatToolbarVoice.value = all.chatToolbarVoice !== false
+      chatToolbarTokenCounter.value = all.chatToolbarTokenCounter !== false
+      chatToolbarLatency.value = all.chatToolbarLatency !== false
 
       // Network
       proxyMode.value = all.proxyMode ?? 'system'
@@ -1149,6 +1179,7 @@ export const useSettingsStore = defineStore('settings', () => {
       allowFileDelete.value = all.allowFileDelete ?? true
       deleteScope.value = all.deleteScope ?? 'outputs-only'
       allowExecCommand.value = all.allowExecCommand ?? false
+      hitlMode.value = all.hitlMode ?? 'auto'
       const nextCommandWhitelist = normalizeCommandWhitelist(all.commandWhitelist)
       commandWhitelist.value = nextCommandWhitelist
       if (Array.isArray(all.commandWhitelist) && JSON.stringify(all.commandWhitelist) !== JSON.stringify(nextCommandWhitelist)) {
@@ -1449,11 +1480,13 @@ export const useSettingsStore = defineStore('settings', () => {
     customCss, pendingCustomCss, customCssPreviewing, customCssBusy, customCssSecondsRemaining,
     animations, reducedMotion, answerStyle, conflictStrategy, quickInputEnabled, creationToolPreferences, agentSkillsPanelEnabled, chatNavigationEnabled, chatNavigationStyle,
     kbMode,
+    chatToolbarAttach, chatToolbarWiki, chatToolbarContext, chatToolbarVoice, chatToolbarTokenCounter,
+    chatToolbarLatency,
     ACCENT_PRESETS, BUILTIN_THEMES,
     // Network
     proxyMode, proxyType, proxyHost, proxyPort, proxyAuth, proxyUser, proxyPass, wikiWebResearchSettings,
     // Sandbox
-    maxIter, maxTaskMin, searchLimit, fileOpLimit, toolCallLimit, modelCallLimit, loopGuard, auditDays, pathRedact, allowFileDelete, deleteScope, allowExecCommand, commandWhitelist, commandBlacklist,
+    maxIter, maxTaskMin, searchLimit, fileOpLimit, toolCallLimit, modelCallLimit, loopGuard, auditDays, pathRedact, allowFileDelete, deleteScope, allowExecCommand, hitlMode, commandWhitelist, commandBlacklist,
     // Notifications
     notifyTaskDone, notifyTaskFailed, notifySound, notifySoundType, notifyDND,
     autoStart, minimizeToTray, trayIcon, trayMenuItems, singleInstance,

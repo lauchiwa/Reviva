@@ -20,8 +20,118 @@ const MAX_IMPORT_FILE_COUNT = 500
 const MAX_IMPORT_FILE_SIZE = 20 * 1024 * 1024
 const MAX_IMPORT_TOTAL_SIZE = 100 * 1024 * 1024
 const CONFIG_DEFAULTS = {
-  version: '', author: '', license: '', allowedTools: [], outputTypes: [],
+  version: '1.0.0', author: '', license: '', allowedTools: [], outputTypes: [],
   createdAt: '', updatedAt: '', trustStatus: '',
+}
+
+// Mapping from external platform tool names to Reviva tool IDs.
+// Used when importing skills from Claude, Codex, GitHub, or other Agent platforms.
+const EXTERNAL_TOOL_MAP = {
+  bash: 'exec_command', shell: 'exec_command', execute: 'exec_command',
+  command: 'exec_command', terminal: 'exec_command', subprocess: 'exec_command',
+  read: 'file_read', read_file: 'file_read', readfile: 'file_read',
+  write: 'file_write', write_file: 'file_write', writefile: 'file_write',
+  edit: 'file_write', create_file: 'file_write', save_file: 'file_write',
+  pdf: 'document_read', docx: 'document_read', xlsx: 'document_read',
+  pptx: 'document_read',
+  vision: 'vision_analyze', image: 'vision_analyze', screenshot: 'vision_analyze',
+  kb: 'kb_search', knowledge: 'kb_search', knowledge_base: 'kb_search',
+  exa: 'mcp:exa', firecrawl: 'mcp:firecrawl-mcp-server',
+  bing: 'web_search_bing', web_search: 'web_search_bing', websearch: 'web_search_bing',
+  search: 'web_search_bing', tavily: 'web_search_tavily',
+}
+
+// Known valid Reviva tool IDs — anything not in this set after mapping is "unmapped".
+const REVIVA_TOOL_IDS = new Set([
+  'file_read', 'file_write', 'file_delete', 'delete_file', 'file_list', 'file_rename', 'file_move', 'file_copy',
+  'document_read', 'office_read', 'office_write', 'pdf_read',
+  'vision_analyze', 'exec_command', 'kb_search', 'wiki', 'note', 'calculator',
+  'media_read', 'pptx_export_local', 'mcp_resource_read', 'mcp_prompt_get',
+  'skill_install', 'web_search_tavily', 'web_search_searxng', 'web_search_bing',
+])
+
+// Patterns in external SKILL.md body that may need manual adaptation.
+const ADAPTATION_PATTERNS = [
+  { re: /\/home\/[A-Za-z]/g, label: '系统用户路径(/home/...)', severity: 'warn' },
+  { re: /~\/\.claude\//g, label: 'Claude 平台路径(~/.claude/)', severity: 'warn' },
+  { re: /~\/\.codex\//g, label: 'Codex 平台路径(~/.codex/)', severity: 'warn' },
+  { re: /C:\\Users\\/g, label: 'Windows 用户路径', severity: 'warn' },
+  { re: /localhost|127\.0\.0\.1/g, label: 'localhost 服务引用', severity: 'warn' },
+  { re: /pip\s+install/g, label: '自动 pip install', severity: 'warn' },
+  { re: /npm\s+install/g, label: '自动 npm install', severity: 'warn' },
+  { re: /\{date\}|YYYY-MM-DD/g, label: '日期占位符未替换', severity: 'warn' },
+  { re: /tempfile\.gettempdir/g, label: '系统临时目录作为输出', severity: 'warn' },
+]
+
+// Icon inference based on description/name keywords
+const ICON_KEYWORDS = [
+  { re: /学习|study|learn|课程|知识|记忆|memor/i, icon: 'ri-book-open-line' },
+  { re: /写作|write|文档|报告|essay|article/i, icon: 'ri-file-text-line' },
+  { re: /代码|code|develop|编程|program|build/i, icon: 'ri-code-s-slash-line' },
+  { re: /分析|analy|chart|数据|统计|stat/i, icon: 'ri-chart-line' },
+  { re: /创意|design|设计|创意|art/i, icon: 'ri-palette-line' },
+  { re: /科学|science|实验|experiment|flask|lab/i, icon: 'ri-flask-line' },
+  { re: /数学|math|计算|calculate|算/i, icon: 'ri-calculator-line' },
+  { re: /视频|video|动画|animation|media|render/i, icon: 'ri-video-line' },
+  { re: /考试|exam|quiz|测试|test|模拟/i, icon: 'ri-file-list-3-line' },
+  { re: /笔记|note|memo|卡片|flash/i, icon: 'ri-sticky-note-line' },
+  { re: /搜索|search|research|研究|find/i, icon: 'ri-search-line' },
+  { re: /安装|install|skill|工具|tool|manage/i, icon: 'ri-tools-line' },
+  { re: /思维|mind|脑图|map|concept/i, icon: 'ri-mind-map' },
+  { re: /音频|audio|voice|speech|tts|配音/i, icon: 'ri-volume-up-line' },
+]
+
+// Category inference from description
+const CATEGORY_KEYWORDS = [
+  { re: /学习|study|课程|知识|考试|quiz|exam|学习|记忆/i, cat: '学习' },
+  { re: /写作|write|文档|报告|essay|article/i, cat: '写作' },
+  { re: /代码|code|develop|编程|program/i, cat: '开发' },
+  { re: /视频|video|动画|animation|media/i, cat: '媒体' },
+  { re: /分析|analy|数据|统计|stat/i, cat: '分析' },
+  { re: /科学|science|实验|experiment/i, cat: '科学' },
+  { re: /安装|install|skill|工具|tool/i, cat: '工具' },
+  { re: /搜索|search|research|研究/i, cat: '研究' },
+]
+
+// Color palette for deterministic assignment from skillId hash
+const SKILL_COLORS = ['#6C8AFF', '#FF7676', '#FACC15', '#4ADE80', '#A78BFA', '#38BDF8', '#FB923C', '#EC4899', '#14B8A6', '#818CF8', '#F472B6', '#34D399']
+
+function _inferIcon(text) {
+  for (const { re, icon } of ICON_KEYWORDS) {
+    if (re.test(text)) return icon
+  }
+  return 'ri-brain-line'
+}
+
+function _inferCategory(text) {
+  for (const { re, cat } of CATEGORY_KEYWORDS) {
+    if (re.test(text)) return cat
+  }
+  return '通用'
+}
+
+function _inferColor(skillId) {
+  let hash = 0
+  for (const ch of String(skillId || '')) hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0
+  return SKILL_COLORS[Math.abs(hash) % SKILL_COLORS.length]
+}
+
+function _inferOutputTypes(text) {
+  const types = []
+  if (/markdown|\.md|文档|note/i.test(text)) types.push('Markdown')
+  if (/html|网页|web page/i.test(text)) types.push('HTML')
+  if (/docx|word/i.test(text)) types.push('DOCX')
+  if (/pptx|slide|幻灯/i.test(text)) types.push('PPTX')
+  if (/xlsx|excel|表格/i.test(text)) types.push('XLSX')
+  if (/pdf/i.test(text)) types.push('PDF')
+  if (/txt|纯文本/i.test(text)) types.push('TXT')
+  return types.length ? types : ['Markdown']
+}
+
+function _extractAuthorFromUrl(url) {
+  if (!url) return ''
+  const m = String(url).match(/github\.com\/([^/]+)\//)
+  return m ? m[1] : ''
 }
 
 function _isTopLevelYamlKey(line) {
@@ -151,17 +261,104 @@ export class SkillService {
       name: String(skillData.name || existing.name || '').trim(),
       description: String(skillData.description || skillData.desc || existing.description || '').trim(),
       source,
-      icon: skillData.icon || existing.icon || 'ri-brain-line',
-      color: skillData.color || existing.color || '#6C8AFF',
-      category: String(skillData.category || existing.category || '').trim(),
+      icon: skillData.icon || existing.icon || _inferIcon(String(skillData.name || '') + ' ' + String(skillData.description || '')),
+      color: skillData.color || existing.color || _inferColor(skillId),
+      category: String(skillData.category || existing.category || _inferCategory(String(skillData.name || '') + ' ' + String(skillData.description || ''))).trim(),
       version: String(skillData.version ?? existing.version ?? CONFIG_DEFAULTS.version),
-      author: String(skillData.author ?? existing.author ?? CONFIG_DEFAULTS.author),
+      author: String(skillData.author || existing.author || _extractAuthorFromUrl(skillData.sourceUrl) || ''),
       license: String(skillData.license ?? existing.license ?? CONFIG_DEFAULTS.license),
-      allowedTools: Array.isArray(skillData.allowedTools) ? skillData.allowedTools : Array.isArray(skillData.allowed_tools) ? skillData.allowed_tools : (Array.isArray(existing.allowedTools) ? existing.allowedTools : []),
-      outputTypes: Array.isArray(skillData.outputTypes) ? skillData.outputTypes : Array.isArray(skillData.output_types) ? skillData.output_types : (Array.isArray(existing.outputTypes) ? existing.outputTypes : []),
-      createdAt: String(skillData.createdAt ?? existing.createdAt ?? CONFIG_DEFAULTS.createdAt),
-      updatedAt: String(skillData.updatedAt ?? existing.updatedAt ?? CONFIG_DEFAULTS.updatedAt),
+      allowedTools: this._resolveAllowedTools(skillData, existing),
+      outputTypes: Array.isArray(skillData.outputTypes) && skillData.outputTypes.length ? skillData.outputTypes : Array.isArray(skillData.output_types) && skillData.output_types.length ? skillData.output_types : (Array.isArray(existing.outputTypes) && existing.outputTypes.length ? existing.outputTypes : _inferOutputTypes(String(skillData.description || '') + ' ' + String(skillData.promptContent || '').slice(0, 500))),
+      createdAt: String(skillData.createdAt || existing.createdAt || new Date().toISOString().slice(0, 10)),
+      updatedAt: new Date().toISOString().slice(0, 10),
       trustStatus: String(skillData.trustStatus ?? existing.trustStatus ?? CONFIG_DEFAULTS.trustStatus),
+    }
+  }
+
+  // Normalize a tool list that may be a string ("Bash, Read, Write") or an array.
+  _normalizeToolList(value) {
+    if (Array.isArray(value)) return value.map(String).filter(Boolean)
+    if (typeof value === 'string') {
+      return value.split(/[,\s]+/).map(s => s.trim()).filter(Boolean)
+    }
+    return []
+  }
+
+  // Map external platform tool names (Bash, Read, Write, etc.) to Reviva tool IDs.
+  // Unknown names are kept as-is so adaptExternalSkill can flag them.
+  _mapToolNames(tools) {
+    if (!Array.isArray(tools)) return []
+    return [...new Set(tools.map(t => {
+      const lower = String(t || '').trim().toLowerCase()
+      return EXTERNAL_TOOL_MAP[lower] || String(t || '').trim()
+    }).filter(Boolean))]
+  }
+
+  // Resolve the final allowedTools list from multiple sources, then map external names.
+  _resolveAllowedTools(skillData, existing) {
+    let raw = null
+    if (Array.isArray(skillData.allowedTools)) raw = skillData.allowedTools
+    else if (Array.isArray(skillData.allowed_tools)) raw = skillData.allowed_tools
+    else {
+      const fmList = this._normalizeToolList(skillData['allowed-tools'])
+      raw = fmList.length ? fmList : (Array.isArray(existing.allowedTools) ? existing.allowedTools : [])
+    }
+    return this._mapToolNames(raw)
+  }
+
+  // Post-install adaptation scan: detect unmapped tools and platform-specific patterns.
+  // Returns a report the agent can present to the user.
+  async adaptExternalSkill(skillId) {
+    const skillDir = this.getSkillDir(skillId)
+    if (!skillDir || !fs.existsSync(skillDir)) return { adapted: false, error: 'Skill 目录不存在' }
+
+    const skillMdPath = path.join(skillDir, 'SKILL.md')
+    const configPath = path.join(skillDir, 'config.json')
+
+    let skillContent = ''
+    try {
+      skillContent = await fs.promises.readFile(skillMdPath, 'utf-8')
+    } catch {
+      return { adapted: false, error: '无法读取 SKILL.md' }
+    }
+
+    const parsed = _extractSkillFrontmatter(skillContent)
+    const config = await this._readJsonFile(configPath) || {}
+    const bodyContent = parsed.body || skillContent
+
+    const mappedTools = []
+    const unmappedTools = []
+    // Read frontmatter allowed-tools (original external names, preserved by _normalizeSkillMarkdown)
+    const fmTools = this._normalizeToolList(parsed.meta?.['allowed-tools'] || parsed.meta?.allowedTools || parsed.meta?.allowed_tools)
+    for (const fmTool of fmTools) {
+      const lower = String(fmTool || '').trim().toLowerCase()
+      if (EXTERNAL_TOOL_MAP[lower] && EXTERNAL_TOOL_MAP[lower] !== lower) {
+        mappedTools.push({ from: fmTool, to: EXTERNAL_TOOL_MAP[lower] })
+      }
+    }
+    // Check config.json allowedTools for any remaining unmapped (non-Reviva, non-MCP) IDs
+    const configTools = Array.isArray(config.allowedTools) ? config.allowedTools : []
+    for (const tool of configTools) {
+      const lower = String(tool || '').trim().toLowerCase()
+      const isMcp = lower.startsWith('mcp:')
+      if (!isMcp && !REVIVA_TOOL_IDS.has(lower)) {
+        unmappedTools.push(tool)
+      }
+    }
+
+    const warnings = []
+    for (const { re, label, severity } of ADAPTATION_PATTERNS) {
+      re.lastIndex = 0
+      const matches = bodyContent.match(re)
+      if (matches) warnings.push({ pattern: label, severity, count: matches.length })
+    }
+
+    return {
+      adapted: mappedTools.length > 0,
+      mappedTools,
+      unmappedTools,
+      warnings,
+      needsAttention: unmappedTools.length > 0 || warnings.length > 0,
     }
   }
 
@@ -570,7 +767,20 @@ export class SkillService {
       const raw = await fs.promises.readFile(path.join(tempDir, 'SKILL.md'), 'utf-8')
       const parsed = _extractSkillFrontmatter(raw)
       const config = await this._readJsonFile(path.join(tempDir, 'config.json')) || {}
-      const skillData = { ...config, ...options, name: options.name || config.name || parsed.meta?.title || skillId, description: options.description || config.description || parsed.meta?.description || '', promptContent: raw, source: 'custom' }
+      const fmAllowedTools = parsed.meta?.['allowed-tools'] || parsed.meta?.allowedTools || parsed.meta?.allowed_tools
+      const skillData = {
+        ...config, ...options,
+        name: options.name || config.name || parsed.meta?.title || skillId,
+        description: options.description || config.description || parsed.meta?.description || '',
+        promptContent: raw, source: 'custom',
+        ...(fmAllowedTools && !config.allowedTools && !config.allowed_tools ? { 'allowed-tools': fmAllowedTools } : {}),
+        version: config.version || parsed.meta?.version || undefined,
+        author: config.author || parsed.meta?.author || undefined,
+        license: config.license || parsed.meta?.license || undefined,
+        icon: config.icon || parsed.meta?.icon || undefined,
+        color: config.color || parsed.meta?.color || undefined,
+        category: config.category || parsed.meta?.category || undefined,
+      }
       await fs.promises.writeFile(path.join(tempDir, 'SKILL.md'), this._normalizeSkillMarkdown(skillId, skillData), 'utf-8')
       await fs.promises.writeFile(path.join(tempDir, 'config.json'), JSON.stringify(this._normalizeConfig(skillId, skillData, config), null, 2), 'utf-8')
       const spec = this._validateSkillDir(skillId, tempDir, false)

@@ -57,6 +57,8 @@ const api = {
     exportTranscript: (mediaId, options) => ipcRenderer.invoke('media:exportTranscript', mediaId, options),
     readFrame: (mediaId, frameId, options) => ipcRenderer.invoke('media:readFrame', mediaId, frameId, options),
     checkSpeechProvider: (providerId, config) => ipcRenderer.invoke('media:checkSpeechProvider', providerId, config),
+    fetchSpeechModels: (providerId, config) => ipcRenderer.invoke('media:fetchSpeechModels', providerId, config),
+    transcribeAudio: (arrayBuffer, options) => ipcRenderer.invoke('media:transcribeAudio', arrayBuffer, options),
     getBilibiliCookieStatus: () => ipcRenderer.invoke('media:getBilibiliCookieStatus'),
     saveBilibiliCookie: (cookie) => ipcRenderer.invoke('media:saveBilibiliCookie', cookie),
   },
@@ -634,6 +636,24 @@ const api = {
       ipcRenderer.removeAllListeners('update:downloaded')
       ipcRenderer.removeAllListeners('update:error')
       ipcRenderer.removeAllListeners('check-for-update')
+    },
+  },
+
+  realtimeASR: {
+    start: (config) => ipcRenderer.invoke('realtimeASR:start', config),
+    sendAudio: (arrayBuffer) => ipcRenderer.send('realtimeASR:sendAudio', arrayBuffer),
+    stop: () => ipcRenderer.invoke('realtimeASR:stop'),
+    onStarted: (cb) => { const h = (_, d) => cb(d); ipcRenderer.on('realtimeASR:started', h); return h },
+    onPartial: (cb) => { const h = (_, d) => cb(d); ipcRenderer.on('realtimeASR:partial', h); return h },
+    onComplete: (cb) => { const h = (_, d) => cb(d); ipcRenderer.on('realtimeASR:complete', h); return h },
+    onError: (cb) => { const h = (_, d) => cb(d); ipcRenderer.on('realtimeASR:error', h); return h },
+    onClosed: (cb) => { const h = (_, d) => cb(d); ipcRenderer.on('realtimeASR:closed', h); return h },
+    removeListeners: () => {
+      ipcRenderer.removeAllListeners('realtimeASR:started')
+      ipcRenderer.removeAllListeners('realtimeASR:partial')
+      ipcRenderer.removeAllListeners('realtimeASR:complete')
+      ipcRenderer.removeAllListeners('realtimeASR:error')
+      ipcRenderer.removeAllListeners('realtimeASR:closed')
     },
   },
 }

@@ -1,5 +1,13 @@
 const mediaApi = () => window.electronAPI?.media
 
+// IPC 走结构化克隆，无法跨进程传递 Vue 响应式代理对象，否则会抛
+// "An object could not be cloned."。进入 ipcRenderer.invoke 前先序列化为纯 JSON，
+// 确保嵌套的 models/capabilities/customParams 等也被剥离成普通对象。
+function toPlainObject(value) {
+  if (value == null || typeof value !== 'object') return value
+  return JSON.parse(JSON.stringify(value))
+}
+
 export async function registerMedia(sourceInput) {
   return mediaApi()?.register(sourceInput)
 }
@@ -69,7 +77,11 @@ export async function readMediaFrame(mediaId, frameId, options = {}) {
 }
 
 export async function checkSpeechProvider(providerId, config = {}) {
-  return mediaApi()?.checkSpeechProvider(providerId, config)
+  return mediaApi()?.checkSpeechProvider(providerId, toPlainObject(config))
+}
+
+export async function fetchSpeechModels(providerId, config = {}) {
+  return mediaApi()?.fetchSpeechModels(providerId, toPlainObject(config))
 }
 
 export async function fetchBilibiliCookieStatus() {

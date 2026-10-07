@@ -87,6 +87,7 @@ const defaultProcessingSettings = {
   mediaPreset: 'subtitle_first',
   mediaPreferredLanguage: 'auto',
   mediaProviderId: 'auto',
+  mediaModelRef: '',
   mediaPreferSubtitle: true,
   mediaExtractKeyframes: false,
   mediaKeyframeLimit: 12,
@@ -538,6 +539,7 @@ function mediaAnalyzeOptions() {
     presetId: settings.mediaPreset || 'subtitle_first',
     language: settings.mediaPreferredLanguage === 'auto' ? '' : settings.mediaPreferredLanguage,
     providerId,
+    modelRef: settings.mediaModelRef || '',
     preferSubtitle: settings.mediaPreferSubtitle !== false,
     extractKeyframes: settings.mediaExtractKeyframes === true,
     keyframeLimit: settings.mediaKeyframeLimit || 12,
@@ -2014,6 +2016,7 @@ watch(showPdfUploadPrompt, (visible) => {
       :web-settings="webImportSettings"
       :web-providers="webImportProviders"
       :configured-speech-providers="mediaStore.configuredSpeechProviders"
+      :configured-models="mediaStore.configuredModels"
       @save="saveProcessingSettings"
       @save-web-settings="saveWebImportSettings"
       @install-local-parser="installPdfLocalParser"

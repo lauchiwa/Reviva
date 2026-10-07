@@ -7,7 +7,7 @@ const isDark = computed(() => appStore.isDark)
 
 const props = defineProps({
   show: { type: Boolean, default: false },
-  width: { type: Number, default: 560 },
+  width: { type: Number, default: 600 },
   height: { type: String, default: '' },
   closable: { type: Boolean, default: true },
   closeOnOverlay: { type: Boolean, default: true },

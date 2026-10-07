@@ -253,13 +253,13 @@ export class JsonArtifactRunner {
 
     const apiFormat = normalizeApiFormat(providerId, options.apiFormat)
     if (apiFormat === 'anthropic') {
-      const anthropicApiUrl = normalizeAnthropicApiUrl(baseUrl)
-      const opts = { ...common, timeout: options.timeout ?? 180000 }
-      if (anthropicApiUrl) opts.anthropicApiUrl = anthropicApiUrl
+     const anthropicApiUrl = normalizeAnthropicApiUrl(baseUrl)
+      const opts = { ...common, timeout: options.timeout ?? 300000 }
+     if (anthropicApiUrl) opts.anthropicApiUrl = anthropicApiUrl
       return new ChatAnthropic(opts)
     }
 
-    const opts = { ...common, timeout: options.timeout ?? 180000, streaming: false }
+    const opts = { ...common, timeout: options.timeout ?? 300000, streaming: false }
     if (baseUrl) {
       opts.configuration = { baseURL: baseUrl }
     }

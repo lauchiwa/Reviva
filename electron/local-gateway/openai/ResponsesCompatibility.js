@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import { GatewayError, GATEWAY_ERROR_CODES } from '../core/GatewayErrors.js'
 
-const CREATION_CENTER = new Set(['quiz-generator', 'ppt-generator', 'mindmap-generator', 'graph-generator', 'flashcard-generator', 'chart-generator', 'deep-researcher', 'lab-report-assistant'])
+const CREATION_CENTER = new Set(['quiz-generator', 'ppt-generator', 'mindmap-generator', 'graph-generator', 'flashcard-generator', 'chart-generator', 'deep-researcher', 'lab-report-assistant', 'study-guide-generator', 'studycard-generator'])
 const WEB_SEARCH_TOOLS = new Set(['web_search', 'web_search_tavily', 'web_search_searxng', 'web_search_bing', 'browser_search', 'mcp:exa', 'mcp:jina-mcp-server'])
 const created = () => Math.floor(Date.now() / 1000)
 

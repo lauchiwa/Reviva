@@ -145,7 +145,7 @@ onBeforeUnmount(() => {
 
 function triggerClasses() {
   return [
-    'w-full rounded-lg border border-solid text-left outline-none transition-all focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60',
+    'w-full rounded-md border border-solid text-left outline-none transition-all focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60',
     'flex items-center gap-2.5',
     props.size === 'comfortable' ? 'min-h-[52px] px-3 py-2.5' : 'min-h-[36px] px-3 py-2',
     props.isDark ? 'bg-d0 border-d4 text-wt-sub hover:border-d3' : 'bg-white border-bdrF text-lt-sub hover:border-lt-aux/30',
@@ -318,5 +318,9 @@ function badgeClasses(option) {
 .option-selector-menu-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+button[role="option"]:not([aria-selected="true"]):hover {
+  background-color: rgba(128, 140, 160, 0.12);
 }
 </style>

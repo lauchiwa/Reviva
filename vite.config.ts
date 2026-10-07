@@ -117,7 +117,8 @@ export default defineConfig({
                 'langsmith',
                 'jsonrepair',
                 'zod',
-                'markdown-docx'
+                'markdown-docx',
+                'ws'
               ]
             }
           }

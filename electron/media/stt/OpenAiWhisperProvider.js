@@ -11,6 +11,14 @@ function transcriptionUrl(baseUrl = '') {
   return `${raw}/v1/audio/transcriptions`
 }
 
+function modelsUrl(baseUrl = '') {
+  const raw = String(baseUrl || '').trim().replace(/\/+$/, '')
+  if (!raw) return ''
+  if (/\/audio\/transcriptions$/i.test(raw)) return raw.replace(/\/audio\/transcriptions$/i, '/models')
+  if (/\/v1$/i.test(raw)) return `${raw}/models`
+  return `${raw}/v1/models`
+}
+
 function audioMimeType(filePath = '') {
   const extension = path.extname(filePath).toLowerCase()
   return ({
@@ -82,10 +90,11 @@ export class OpenAiWhisperProvider {
     this.displayName = displayName
   }
 
-  getCapabilities() {
+  getCapabilities(config = {}) {
     return normalizeSpeechToTextCapabilities({
       inputModes: [SPEECH_TO_TEXT_INPUT_MODES.LOCAL_FILE],
       timestampLevels: [SPEECH_TO_TEXT_TIMESTAMP_LEVELS.NONE, SPEECH_TO_TEXT_TIMESTAMP_LEVELS.SEGMENT, SPEECH_TO_TEXT_TIMESTAMP_LEVELS.WORD],
+      maxFileBytes: Number(config.customParams?.maxFileBytes) || 50 * 1024 * 1024,
     })
   }
 
@@ -104,6 +113,47 @@ export class OpenAiWhisperProvider {
       authenticated: Boolean(config.apiKey),
       message: '配置格式有效；为避免产生转写费用，未发送音频请求。',
     }
+  }
+
+  async listModels(config = {}, context = {}) {
+    const url = modelsUrl(config.baseUrl)
+    if (!url) throw new MediaError(MEDIA_ERROR_CODES.STT_NOT_CONFIGURED, `${this.displayName} 缺少 Base URL。`, { provider: this.id, stage: 'stt' })
+    let parsed
+    try { parsed = new URL(url) } catch {
+      throw new MediaError(MEDIA_ERROR_CODES.INVALID_ARGUMENT, `${this.displayName} Base URL 无效。`, { provider: this.id, stage: 'stt' })
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) throw new MediaError(MEDIA_ERROR_CODES.INVALID_ARGUMENT, `${this.displayName} 仅支持 HTTP(S) 地址。`, { provider: this.id, stage: 'stt' })
+    let response
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+        signal: context.signal,
+      })
+    } catch (error) {
+      if (error?.name === 'AbortError') throw new MediaError(MEDIA_ERROR_CODES.CANCELLED, `${this.displayName} 获取模型列表已取消。`, { provider: this.id, stage: 'stt' })
+      throw new MediaError(MEDIA_ERROR_CODES.STT_FAILED, `${this.displayName} 获取模型列表失败：${error.message}`, { provider: this.id, stage: 'stt', retryable: true, cause: error })
+    }
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      const hint = response.status === 401 || response.status === 403
+        ? 'API Key 可能不正确或无访问权限。'
+        : response.status === 404
+          ? '服务端未提供 /models 接口。'
+          : ''
+      throw new MediaError(MEDIA_ERROR_CODES.STT_FAILED, `${this.displayName} 获取模型列表失败（HTTP ${response.status}）${hint ? '；' + hint : ''}`, { provider: this.id, stage: 'stt', status: response.status, retryable: response.status >= 500, cause: text })
+    }
+    const data = await response.json().catch(() => null)
+    const sourceList = Array.isArray(data?.data) ? data.data : Array.isArray(data?.models) ? data.models : Array.isArray(data) ? data : []
+    const models = sourceList
+      .map(item => {
+        const id = typeof item === 'string' ? item : String(item.id || item.name || '').trim()
+        if (!id) return null
+        const name = typeof item === 'string' ? id : String(item.id || item.name || id)
+        return { id, name }
+      })
+      .filter(Boolean)
+    return { models }
   }
 
   async transcribe(input = {}, config = {}, context = {}) {

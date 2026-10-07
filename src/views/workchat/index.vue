@@ -44,12 +44,14 @@ const SaveMessageToNoteModal = defineAsyncComponent(() => import('./sections/exp
 const MindmapModal = defineAsyncComponent(() => import('./sections/rightpanel/modals/MindmapModal.vue'))
 const GraphModal = defineAsyncComponent(() => import('./sections/rightpanel/modals/GraphModal.vue'))
 const FlashcardModal = defineAsyncComponent(() => import('./sections/rightpanel/modals/FlashcardModal.vue'))
+const StudyCardModal = defineAsyncComponent(() => import('./sections/rightpanel/modals/StudyCardModal.vue'))
 const KnowledgeToolModal = defineAsyncComponent(() => import('./sections/rightpanel/modals/KnowledgeToolModal.vue'))
 const QuizModal = defineAsyncComponent(() => import('./sections/rightpanel/modals/QuizModal.vue'))
 const ChartModal = defineAsyncComponent(() => import('./sections/rightpanel/modals/ChartModal.vue'))
 const PodcastModal = defineAsyncComponent(() => import('./sections/rightpanel/modals/PodcastModal.vue'))
 const ResearchModal = defineAsyncComponent(() => import('./sections/rightpanel/modals/ResearchModal.vue'))
 const PptModal = defineAsyncComponent(() => import('./sections/rightpanel/modals/PptModal.vue'))
+const StudyguideModal = defineAsyncComponent(() => import('./sections/rightpanel/modals/StudyguideModal.vue'))
 const MediaDetailModal = defineAsyncComponent(() => import('@/components/media/MediaDetailModal.vue'))
 
 const appStore = useAppStore()
@@ -206,24 +208,28 @@ const showPptModal = ref(false)
 const showMindmapModal = ref(false)
 const showGraphModal = ref(false)
 const showFlashcardModal = ref(false)
+const showStudyCardModal = ref(false)
 const showQaModal = ref(false)
 const showGlossaryModal = ref(false)
 const showCheatsheetModal = ref(false)
 const showQuizModal = ref(false)
 const showChartModal = ref(false)
 const showPodcastModal = ref(false)
+const showStudyguideModal = ref(false)
 const renderedModals = reactive({
   research: false,
   ppt: false,
   mindmap: false,
   graph: false,
   flashcard: false,
+  studycard: false,
   qa: false,
   glossary: false,
   cheatsheet: false,
   quiz: false,
   chart: false,
-  podcast: false,
+ podcast: false,
+  studyguide: false,
   conversationExport: false,
   saveMessageToNote: false,
 })
@@ -276,12 +282,14 @@ const lazyModalVisibility = {
   mindmap: showMindmapModal,
   graph: showGraphModal,
   flashcard: showFlashcardModal,
+  studycard: showStudyCardModal,
   qa: showQaModal,
   glossary: showGlossaryModal,
   cheatsheet: showCheatsheetModal,
   quiz: showQuizModal,
   chart: showChartModal,
   podcast: showPodcastModal,
+  studyguide: showStudyguideModal,
   conversationExport: showConversationExport,
   saveMessageToNote: showSaveMessageToNote,
 }
@@ -1401,6 +1409,8 @@ function handleBuiltinTool(tool) {
     showGraphModal.value = true
   } else if (tool.id === 'flashcard') {
     showFlashcardModal.value = true
+  } else if (tool.id === 'studycard') {
+    showStudyCardModal.value = true
   } else if (tool.id === 'qa') {
     showQaModal.value = true
   } else if (tool.id === 'glossary') {
@@ -1413,6 +1423,8 @@ function handleBuiltinTool(tool) {
     showChartModal.value = true
   } else if (tool.id === 'podcast') {
     showPodcastModal.value = true
+  } else if (tool.id === 'studyguide') {
+    showStudyguideModal.value = true
   }
 }
 
@@ -1533,12 +1545,15 @@ async function handleGenTaskSubmit(payload) {
   if (toolId === 'mindmap') showMindmapModal.value = false
   else if (toolId === 'graph') showGraphModal.value = false
   else if (toolId === 'flashcard') showFlashcardModal.value = false
+  else if (toolId === 'studycard') showStudyCardModal.value = false
   else if (toolId === 'qa') showQaModal.value = false
   else if (toolId === 'glossary') showGlossaryModal.value = false
   else if (toolId === 'cheatsheet') showCheatsheetModal.value = false
   else if (toolId === 'quiz') showQuizModal.value = false
   else if (toolId === 'chart') showChartModal.value = false
   else if (toolId === 'podcast') showPodcastModal.value = false
+
+  else if (toolId === 'studyguide') showStudyguideModal.value = false
   else if (toolId === 'research') showResearchModal.value = false
   else if (toolId === 'ppt') showPptModal.value = false
 
@@ -1560,7 +1575,7 @@ async function handleGenTaskSubmit(payload) {
   }
 
   const ctxSnapshot = JSON.parse(JSON.stringify(currentCtxItems.value || []))
-  const needsTopicOrSource = ['mindmap', 'graph', 'flashcard', 'quiz', 'chart', 'qa', 'glossary', 'cheatsheet'].includes(toolId)
+  const needsTopicOrSource = ['mindmap', 'graph', 'flashcard', 'quiz', 'chart', 'qa', 'glossary', 'cheatsheet', 'studycard'].includes(toolId)
   if (needsTopicOrSource && !String(payload.topic || '').trim() && !readableGenerationContexts(ctxSnapshot).length && !selectedWikiRefs.value.length) {
     msg.warning('请填写主题，或选择具体文件、知识库或 Wiki')
     return
@@ -1596,7 +1611,7 @@ async function handleGenTaskSubmit(payload) {
 
   // Notify right-panel to refresh task list
   window.dispatchEvent(new CustomEvent('reviva:gen-task-created', { detail: res.task }))
-  msg.success(`已开始生成${{ mindmap: '思维导图', graph: '知识图谱', flashcard: '闪卡', quiz: '测验', chart: '图表', qa: 'Q&A 问答卡', glossary: '术语表', cheatsheet: '速查表', podcast: '播客', research: '深度研究', ppt: 'PPT' }[toolId] || ''}`)
+  msg.success(`已开始生成${{ mindmap: '思维导图', graph: '知识图谱', flashcard: '闪卡', studycard: '知识卡片', quiz: '测验', chart: '图表', qa: 'Q&A 问答卡', glossary: '术语表', cheatsheet: '速查表', podcast: '播客', research: '深度研究', ppt: 'PPT', studyguide: '学习指南' }[toolId] || ''}`)
 }
 
 async function handleResearchStart({ requirement, settings }) {
@@ -1621,6 +1636,35 @@ async function handleResearchStart({ requirement, settings }) {
         }
       : {
           outputFormats: ['md', 'html'],
+          enable_web_search: settings?.enableWebSearch !== false,
+        },
+  })
+}
+
+async function handleStudyguideStart({ requirement, guideType, settings }) {
+  const ctxItems = currentCtxItems.value
+  const sourceItems = [...ctxItems, ...selectedWikiRefs.value]
+  const fileNames = sourceItems.map(i => i.name || i.path).join('、')
+  const mode = settings?.mode === 'cloud' ? 'cloud' : 'local'
+  if (mode === 'local' && !sourceItems.length) {
+    msg.warning('请先选择要学习的文件、文件夹、知识库或 Wiki')
+    return
+  }
+  await handleGenTaskSubmit({
+    toolId: 'studyguide',
+    mode,
+    topic: requirement || `请根据以下资料生成学习指南：${fileNames}`,
+    params: mode === 'cloud'
+      ? {
+          outputFormats: ['markdown', 'html'],
+          guideType: guideType || 'comprehensive',
+          detailLevel: 'standard',
+          language: 'zh-CN',
+          enable_web_search: settings?.enableWebSearch !== false,
+        }
+      : {
+          outputFormats: ['md', 'html'],
+          guideType: guideType || 'comprehensive',
           enable_web_search: settings?.enableWebSearch !== false,
         },
   })
@@ -1836,6 +1880,7 @@ async function reanalyzeWorkchatMedia(item) {
     presetId: settings.mediaPreset || 'subtitle_first',
     language: settings.mediaPreferredLanguage === 'auto' ? '' : (settings.mediaPreferredLanguage || ''),
     providerId: settings.mediaProviderId || 'auto',
+    modelRef: settings.mediaModelRef || '',
     preferSubtitle: settings.mediaPreferSubtitle !== false,
     extractKeyframes: settings.mediaExtractKeyframes === true,
     keyframeLimit: settings.mediaKeyframeLimit || 12,
@@ -2449,6 +2494,13 @@ function animateTitle(convId, targetTitle, tab) {
       :wiki-items="selectedWikiRefs"
       @submit="handleGenTaskSubmit"
     />
+    <StudyCardModal
+      v-if="renderedModals.studycard"
+      v-model:show="showStudyCardModal"
+      :ctx-items="currentCtxItems"
+      :wiki-items="selectedWikiRefs"
+      @submit="handleGenTaskSubmit"
+    />
     <KnowledgeToolModal
       v-if="renderedModals.qa"
       v-model:show="showQaModal"
@@ -2492,6 +2544,13 @@ function animateTitle(convId, targetTitle, tab) {
       v-model:show="showPodcastModal"
       :ctx-items="currentCtxItems"
       @submit="handleGenTaskSubmit"
+    />
+    <StudyguideModal
+      v-if="renderedModals.studyguide"
+      v-model:show="showStudyguideModal"
+      :ctx-items="currentCtxItems"
+      :wiki-items="selectedWikiRefs"
+      @start="handleStudyguideStart"
     />
     <ConversationExportModal
       v-if="renderedModals.conversationExport"

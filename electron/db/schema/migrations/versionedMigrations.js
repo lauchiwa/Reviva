@@ -3,6 +3,8 @@ import { BaseRepository } from '../../repositories/BaseRepository.js'
 import { createMediaTables } from '../../../media/persistence/MediaSchema.js'
 import { createModelProviderTables } from '../../schema/ModelProviderSchema.js'
 import { ModelProviderRepository } from '../../repositories/ModelProviderRepository.js'
+import { createImageProviderTables } from '../../schema/ImageProviderSchema.js'
+import { ImageProviderRepository } from '../../repositories/ImageProviderRepository.js'
 import { createSpeechProviderTables } from '../../schema/SpeechProviderSchema.js'
 import { createLearningMemoryTables } from '../../../learning-memory/LearningMemorySchema.js'
 import { createLearningRunResultTables } from '../LearningRunResultSchema.js'
@@ -231,6 +233,15 @@ export class VersionedMigrationManager extends BaseRepository {
         version: 11,
         name: 'create_learning_run_results',
         up: db => createLearningRunResultTables(db),
+      },
+      {
+        version: 12,
+        name: 'create_image_provider_profiles',
+        up: db => {
+          createImageProviderTables(db)
+          const legacy = db.prepare("SELECT value FROM settings WHERE key = 'imageModels'").get()
+          new ImageProviderRepository({ db }).migrateLegacyImageProviders(legacy?.value)
+        },
       },
     ]
   }

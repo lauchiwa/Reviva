@@ -56,6 +56,26 @@ const DEFAULT_COMMAND_BLACKLIST = [
   'powershell',
   'cmd',
 ]
+const DESTRUCTIVE_COMMAND_PATTERNS = [
+  /\brm\s+(-[a-z]*r[a-z]*|-[a-z]*f[a-z]*)/i,  // rm -rf, rm -r, rm -f (bulk/force delete)
+  /\brmdir\s+\/?s/i,                          // rmdir /s (Windows recursive)
+  /\bdel\s+\/?[sq]/i,                         // del /s, del /q (Windows force delete)
+  /\bformat\b/i,                               // disk format
+  /\bmkfs\b/i,                                 // filesystem creation
+  /\bshutdown\b/i,                             // system shutdown
+  /\breboot\b/i,                               // system reboot
+  /\bgit\s+push\s+.*(-f|--force)/i,           // git push --force only (plain push is routine)
+  /\bgit\s+reset\s+--hard\b/i,               // discard uncommitted changes
+  /\bgit\s+clean\s+.*-[a-z]*[fd]/i,           // git clean -fd (removes untracked)
+  /\bnpm\s+publish\b/i,                       // irreversible package publish
+  /\bpnpm\s+publish\b/i,                      // irreversible package publish
+]
+
+export function isDestructiveCommand(commandStr) {
+  const cmd = String(commandStr || '').trim()
+  if (!cmd) return false
+  return DESTRUCTIVE_COMMAND_PATTERNS.some(p => p.test(cmd))
+}
 
 export const SAFE_COMMAND_TOOL_DESCRIPTION = [
   '在终端执行单条白名单命令。推荐使用结构化参数 {cmd,args,cwd}，路径参数使用 /project、/docs、/context、/agents/... 等虚拟路径。',
@@ -269,7 +289,7 @@ export function prepareSafeCommand(command, {
   const globalWhitelist = commandList(dbService.getSetting?.('commandWhitelist') ?? DEFAULT_COMMAND_WHITELIST)
   const agentWhitelist = commandList(execConfig?.whitelist ?? [])
   const effectiveWhitelist = [...globalWhitelist, ...agentWhitelist]
-  if (!commandAllowedByWhitelist(trimmedCmd, baseCmd, cmdName, effectiveWhitelist)) {
+  if (!hitlEnabled && !commandAllowedByWhitelist(trimmedCmd, baseCmd, cmdName, effectiveWhitelist)) {
     return { error: `安全限制：命令 "${baseCmd}" 不在白名单中。当前允许的命令：${effectiveWhitelist.join(', ')}。如需允许请在设置中添加。` }
   }
 
@@ -298,6 +318,7 @@ export function prepareSafeStructuredCommand(input = {}, {
   execConfig = null,
   vfsResolver = null,
   vfsContext = null,
+  hitlEnabled = false,
 } = {}) {
   if (!dbService?.getSetting) {
     return { error: '安全限制：未初始化命令安全设置，不能执行命令。' }
@@ -333,7 +354,7 @@ export function prepareSafeStructuredCommand(input = {}, {
   const globalWhitelist = commandList(dbService.getSetting?.('commandWhitelist') ?? DEFAULT_COMMAND_WHITELIST)
   const agentWhitelist = commandList(execConfig?.whitelist ?? [])
   const effectiveWhitelist = [...globalWhitelist, ...agentWhitelist]
-  if (!commandAllowedByWhitelist(commandText, baseCmd, cmdName, effectiveWhitelist)) {
+  if (!hitlEnabled && !commandAllowedByWhitelist(commandText, baseCmd, cmdName, effectiveWhitelist)) {
     return { error: `安全限制：命令 "${baseCmd}" 不在白名单中。当前允许的命令：${effectiveWhitelist.join(', ')}。如需允许请在设置中添加。` }
   }
 

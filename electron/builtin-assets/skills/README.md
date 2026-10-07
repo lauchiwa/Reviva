@@ -69,7 +69,7 @@ allowed-tools: kb_search, file_read
 
 1. **On Electron startup**, `SkillService.installAllBuiltinSkills()` scans this directory
 2. For each subfolder, if `{workspace}/skills/{id}/` does NOT exist yet, the entire folder tree is copied over
-3. If the destination already exists, it is **left untouched** (preserves user modifications)
+3. If the destination already exists and is still a platform skill, it is refreshed **only when the bundled version changes or the workspace copy fails spec validation**; user-modified (non-platform) copies are left untouched
 4. Skills are then visible in the Skill Market page; users toggle them on/off (writes to `custom_skills` DB row with `source='platform'`)
 
 ## Adding a New Built-in Skill

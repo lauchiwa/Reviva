@@ -13,6 +13,7 @@ export const DEFAULT_PDF_READ_SETTINGS = {
   mediaPreset: 'subtitle_first',
   mediaPreferredLanguage: 'auto',
   mediaProviderId: 'auto',
+  mediaModelRef: '',
   mediaPreferSubtitle: true,
   mediaExtractKeyframes: false,
   mediaKeyframeLimit: 12,
@@ -27,7 +28,8 @@ const ENUMS = {
   mediaAction: new Set(['manual', 'ask', 'low_cost_auto']),
   mediaPreset: new Set(['subtitle_first', 'standard', 'transcript_only', 'keyframe_enhanced', 'local_private']),
   mediaPreferredLanguage: new Set(['auto', 'zh', 'en', 'ja']),
-  mediaProviderId: new Set(['auto', 'local_asr', 'openai_whisper_compatible', 'aliyun_bailian_asr']),
+  mediaProviderId: new Set(['auto', 'local_asr', 'openai_whisper_compatible', 'siliconflow_asr', 'aliyun_bailian_asr']),
+  mediaModelRef: null,
 }
 
 function enumValue(value, fallback, allowed) {

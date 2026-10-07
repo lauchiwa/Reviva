@@ -31,14 +31,16 @@ const taskTools = {
   mindmap: { name: '思维导图', icon: 'ri-mind-map', color: 'emerald' },
   graph: { name: '知识图谱', icon: 'ri-node-tree', color: 'amber' },
   flashcard: { name: '闪卡', icon: 'ri-stack-line', color: 'pink' },
+  studycard: { name: '知识卡片', icon: 'ri-coupon-line', color: 'amber' },
   quiz: { name: '测验', icon: 'ri-questionnaire-line', color: 'emerald' },
   chart: { name: '图表', icon: 'ri-bar-chart-box-line', color: 'sky' },
   qa: { name: 'Q&A 问答卡', icon: 'ri-question-answer-line', color: 'brand' },
   glossary: { name: '术语表', icon: 'ri-book-2-line', color: 'agent' },
   cheatsheet: { name: '速查表', icon: 'ri-file-list-3-line', color: 'amber' },
   podcast: { name: '播客', icon: 'ri-mic-2-line', color: 'agent' },
-  research: { name: '深度研究', icon: 'ri-search-eye-line', color: 'sky' },
-  ppt: { name: 'PPT', icon: 'ri-slideshow-line', color: 'brand' },
+ research: { name: '深度研究', icon: 'ri-search-eye-line', color: 'sky' },
+ ppt: { name: 'PPT', icon: 'ri-slideshow-line', color: 'brand' },
+  studyguide: { name: '学习指南', icon: 'ri-book-open-line', color: 'emerald' },
 }
 const defaultTool = { name: '任务', icon: 'ri-magic-line', color: 'brand' }
 const taskBarClass = {
@@ -53,6 +55,7 @@ const artifactTypeLabels = {
   summary: '摘要',
   mindmap: '思维导图',
   flashcard: '闪卡',
+  studycard: '知识卡片',
   quiz: '测验',
   chart: '图表',
   qa: 'Q&A 问答卡',
@@ -62,8 +65,9 @@ const artifactTypeLabels = {
   presentation: 'PPT',
   podcast: '播客',
   graph: '知识图谱',
-  research: '深度研究',
-  custom: '自定义',
+ research: '深度研究',
+ custom: '自定义',
+  studyguide: '学习指南',
 }
 
 const visibleTaskStatuses = new Set(['pending', 'running', 'completed', 'failed', 'cancelled'])

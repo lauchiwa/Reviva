@@ -224,6 +224,32 @@ function buildContextManagementSection(memoryDirName) {
 - 永远不要保存 API Key、访问令牌、密码、身份证号、银行卡号等敏感凭据；如果用户提供，应提醒不要明文保存。`
 }
 
+function buildSkillInstallSection() {
+  return `## Skill 安装能力
+
+你已默认绑定 skill-installer 技能，拥有 skill_install 工具。当用户说"安装 skill""帮我安装 xxx""我下载了 skill""创建一个 skill""更新 skill"时，直接使用 skill_install 工具，不要用 exec_command 或文件工具手动操作 /skills/ 目录（会被安全策略拦截）。
+
+主要操作：
+- install_url：从 GitHub URL 安装（自动 git clone，无 git 时自动下载 ZIP，支持镜像加速）
+- install_path：从本地文件夹或 ZIP 文件导入
+- create：从名称和描述创建新 Skill
+- update：从 GitHub URL 重新拉取并更新已安装的 Skill
+- list：列出已安装和可用的内置 Skill
+- validate/info/uninstall：验证、查看、删除 Skill
+
+详细用法见 /skills/skill-installer/SKILL.md。安装后建议用户关闭并重新打开 Reviva 使新 Skill 生效。`
+}
+function buildSkillAdaptationNote() {
+  return `
+## 外部 Skill 平台适配
+从 GitHub、Claude、Codex 等外部来源安装的 Skill 会自动扫描适配问题。安装返回的 adaptation 报告包含：
+- mappedTools: 已自动映射的工具（如 Bash→exec_command）
+- unmappedTools: 无法识别的工具名，需告知用户
+- warnings: SKILL.md 中的平台特定模式（系统路径、localhost、pip/npm install 等）
+- needsAttention: true 时必须告知用户该 Skill 可能需要手动适配才能正常使用
+适配规则和工具映射表详见 /skills/skill-installer/SKILL.md 的"平台适配"部分。`
+}
+
 function buildSkillIsolationSection(skillInfo = []) {
   if (!skillInfo?.length) return ''
   const boundList = skillInfo.map(s => `- ${s.id}${s.name && s.name !== s.id ? ` (${s.name})` : ''}: ${s.desc || '无描述'}；路径：/skills/${s.id}/`).join('\n')
@@ -297,8 +323,10 @@ export function buildProjectSystemPrompt({
     buildCloudKnowledgeSection(cloudContext),
     buildLocalToolsetsSection(agentDirName, today),
     buildAnswerStyleSection(answerStyle),
-    buildContextManagementSection(memoryDirName),
-    buildSkillIsolationSection(skillInfo),
-    buildFilePathMappingSection(workRoot, ctxPaths),
-  ].filter(Boolean).join('\n\n')
+   buildContextManagementSection(memoryDirName),
+   buildSkillIsolationSection(skillInfo),
+   buildSkillInstallSection(),
+   buildSkillAdaptationNote(),
+  buildFilePathMappingSection(workRoot, ctxPaths),
+ ].filter(Boolean).join('\n\n')
 }

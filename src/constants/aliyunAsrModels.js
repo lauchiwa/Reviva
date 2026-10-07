@@ -8,6 +8,7 @@ export const ALIYUN_ASR_PROTOCOLS = Object.freeze({
   ASYNC_FILE_URL: 'async_file_url',
   QWEN_FLASH_CHAT: 'qwen_flash_chat',
   FUN_ASR_FLASH: 'fun_asr_flash',
+  REALTIME_WSS: 'realtime_wss',
 })
 
 export const ALIYUN_ASR_MODEL_CAPABILITIES = Object.freeze([
@@ -29,7 +30,7 @@ export const ALIYUN_ASR_MODEL_CAPABILITIES = Object.freeze([
     name: 'Qwen3-ASR-Flash-Filetrans',
     description: '长音频异步转写，支持句级和字级时间戳',
     recommended: false,
-    preset: true,
+    preset: false,
     protocol: ALIYUN_ASR_PROTOCOLS.ASYNC_FILE_URL,
     inputModes: Object.freeze(['public_url']),
     maxFileBytes: 2 * GB,
@@ -77,8 +78,86 @@ export const ALIYUN_ASR_MODEL_CAPABILITIES = Object.freeze([
     supportsDiarization: false,
     diarizationRecommendedMaxDurationMs: 0,
   }),
-])
 
+  Object.freeze({
+    id: 'paraformer-realtime-v2',
+    name: 'Paraformer-Realtime-V2',
+    description: '实时语音识别，WSS 协议边说边返回文字',
+    recommended: false,
+    preset: false,
+    protocol: ALIYUN_ASR_PROTOCOLS.REALTIME_WSS,
+    inputModes: Object.freeze(['realtime_stream']),
+    maxFileBytes: 0,
+    maxDurationMs: 60 * MINUTE,
+    supportsDiarization: false,
+    diarizationRecommendedMaxDurationMs: 0,
+  }),
+  Object.freeze({
+    id: 'qwen-audio-3.0-asr-flash-streaming',
+    name: 'Qwen-Audio-3.0-ASR-Flash-Streaming',
+    description: '推荐 · 实时多语言转写，支持热词和上下文提示',
+    recommended: true,
+    preset: false,
+    protocol: ALIYUN_ASR_PROTOCOLS.REALTIME_WSS,
+    inputModes: Object.freeze(['realtime_stream']),
+    maxFileBytes: 0,
+    maxDurationMs: 0,
+    supportsDiarization: false,
+    diarizationRecommendedMaxDurationMs: 0,
+  }),
+  Object.freeze({
+    id: 'paraformer-realtime-v1',
+    name: 'Paraformer-Realtime-V1',
+    description: '实时语音识别，16kHz，中英日韩等',
+    recommended: false,
+    preset: false,
+    protocol: ALIYUN_ASR_PROTOCOLS.REALTIME_WSS,
+    inputModes: Object.freeze(['realtime_stream']),
+    maxFileBytes: 0,
+    maxDurationMs: 0,
+    supportsDiarization: false,
+    diarizationRecommendedMaxDurationMs: 0,
+  }),
+  Object.freeze({
+    id: 'fun-asr-realtime',
+    name: 'Fun-ASR-Realtime',
+    description: '实时语音识别，支持各种音频格式',
+    recommended: false,
+    preset: false,
+    protocol: ALIYUN_ASR_PROTOCOLS.REALTIME_WSS,
+    inputModes: Object.freeze(['realtime_stream']),
+    maxFileBytes: 0,
+    maxDurationMs: 0,
+    supportsDiarization: false,
+    diarizationRecommendedMaxDurationMs: 0,
+  }),
+  Object.freeze({
+    id: 'qwen3-asr-flash-realtime',
+    name: 'Qwen3-ASR-Flash-Realtime',
+    description: '实时转写，支持情感识别，8/16kHz',
+    recommended: false,
+    preset: false,
+    protocol: ALIYUN_ASR_PROTOCOLS.REALTIME_WSS,
+    inputModes: Object.freeze(['realtime_stream']),
+    maxFileBytes: 0,
+    maxDurationMs: 0,
+    supportsDiarization: false,
+    diarizationRecommendedMaxDurationMs: 0,
+  }),
+  Object.freeze({
+    id: 'gummy-realtime-v1',
+    name: 'Gummy-Realtime-V1',
+    description: '实时转写，中英及方言（待废弃）',
+    recommended: false,
+    preset: false,
+    protocol: ALIYUN_ASR_PROTOCOLS.REALTIME_WSS,
+    inputModes: Object.freeze(['realtime_stream']),
+    maxFileBytes: 0,
+    maxDurationMs: 60 * MINUTE,
+    supportsDiarization: false,
+    diarizationRecommendedMaxDurationMs: 0,
+  }),
+])
 const MODEL_BY_ID = new Map(ALIYUN_ASR_MODEL_CAPABILITIES.map(model => [model.id, model]))
 
 export const ALIYUN_ASR_PRESET_MODELS = Object.freeze(
@@ -87,6 +166,25 @@ export const ALIYUN_ASR_PRESET_MODELS = Object.freeze(
 
 export function getAliyunAsrModelCapability(modelId) {
   return MODEL_BY_ID.get(String(modelId || '').trim().toLowerCase()) || null
+}
+
+// 返回百炼模型的调用类型标签，用于在 UI 上区分“异步文件 / 短音频 / 实时”。
+// 实时模型由现有的“实时”能力徽标覆盖，这里返回空避免重复。
+export function getAliyunAsrModelTypeLabel(modelId) {
+  const cap = getAliyunAsrModelCapability(modelId)
+  if (!cap) return ''
+  switch (cap.protocol) {
+    case ALIYUN_ASR_PROTOCOLS.ASYNC_FILE_URLS:
+    case ALIYUN_ASR_PROTOCOLS.ASYNC_FILE_URL:
+      return '异步文件'
+    case ALIYUN_ASR_PROTOCOLS.QWEN_FLASH_CHAT:
+    case ALIYUN_ASR_PROTOCOLS.FUN_ASR_FLASH:
+      return '短音频'
+    case ALIYUN_ASR_PROTOCOLS.REALTIME_WSS:
+      return ''
+    default:
+      return ''
+  }
 }
 
 export function formatAliyunAsrLimit(capability) {

@@ -1,0 +1,9 @@
+{
+  "scan_dir": "/agents/study-guide-generator/outputs/{date}/",
+  "file_patterns": [
+    { "ext": "md", "type": "studyguide", "icon": "ri-book-open-line", "title_template": "{filename}" },
+    { "ext": "html", "type": "studyguide", "icon": "ri-book-open-line", "title_template": "{filename}" }
+  ],
+  "filter_mtime_after_run": true,
+  "group_id_from_conversation": true
+}

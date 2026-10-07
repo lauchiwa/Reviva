@@ -1,0 +1,71 @@
+{
+  "id": "agent_study_guide",
+  "name": "学习指南生成器",
+  "english_name": "study-guide-generator",
+  "description": "基于用户提供的文档、知识库和联网资料，生成结构化的学习指南，包含学习目标、核心概念、章节摘要、练习题和复习建议。",
+  "icon": "ri-book-open-line",
+  "color": "#10B981",
+  "architecture": "plan_exec",
+  "builtin": true,
+  "category": "创作中心",
+  "permissions": {
+    "fileRead": true,
+    "fileWrite": true,
+    "webSearch": true,
+    "fileDelete": false,
+    "fileRename": false,
+    "execCommand": false
+  },
+  "tools": [
+    "mcp:exa",
+    "mcp:jina-mcp-server",
+    "web_search_bing",
+    "file_read",
+    "file_write",
+    "document_read",
+    "media_read",
+    "vision_analyze",
+    "kb_search",
+    "wiki_tool"
+  ],
+  "skills": [],
+  "sub_agents": [
+    "material-analyst",
+    "web-researcher",
+    "guide-writer"
+  ],
+  "subagent_tools": {
+    "material-analyst": [
+      "file_read",
+      "document_read",
+      "media_read",
+      "vision_analyze",
+      "kb_search",
+      "wiki_tool"
+    ],
+    "web-researcher": [
+      "mcp:exa",
+      "mcp:jina-mcp-server",
+      "web_search_bing"
+    ],
+    "guide-writer": [
+      "file_read",
+      "file_write"
+    ]
+  },
+  "max_iterations": 15,
+  "plan_steps": 5,
+  "temperature": 0.3,
+  "max_tokens": 8192,
+  "thinking_mode": "auto",
+  "thinking_intensity": "medium",
+  "hard_timeout_ms": 3600000,
+  "required_tools": [],
+  "prompt_file": "orchestrator.md",
+  "subagent_dir": "subagents",
+  "artifact_rules_file": "artifact-rules.json",
+  "output_formats": [
+    "md",
+    "html"
+  ]
+}

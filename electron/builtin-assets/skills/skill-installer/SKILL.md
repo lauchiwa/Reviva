@@ -1,615 +1,222 @@
 ---
 name: skill-installer
-description: 跨平台智能安装助手：自动检测操作系统，适配Windows/macOS/Linux命令，处理Git/网络/路径问题。当用户说"安装skill"、"帮我安装xxx"、"我下载了skill，路径是xxx"时触发。
-disable-model-invocation: true
-allowed-tools: Bash(git *), Bash(curl *), Bash(wget *), Bash(mv *), Bash(cp *), Bash(mkdir *), Bash(ls *), Bash(unzip *), Read, Grep, Glob
+description: 安装和管理 Reviva Skills。支持从 GitHub URL 克隆、本地路径/ZIP 导入、以及从描述创建新 Skill。当用户说"安装 skill""帮我安装 xxx""我下载了 skill""创建一个 skill"时触发。
 ---
 
-# 跨平台智能安装助手
+# Skill 安装助手
 
-自动检测操作系统，适配各种环境，智能处理安装问题。
+使用 `skill_install` 工具完成 Skill 的安装、创建和管理。此技能默认绑定到所有 Agent。
+
+## 核心概念
+
+- Skill 安装到工作空间的 `skills/` 目录下，路径为 `/skills/{skillId}/`
+- 每个 Skill 目录必须包含 `SKILL.md`，以 YAML frontmatter 开头（`name` 和 `description` 为必填字段）
+- 安装时需要创建或更新 `config.json`，包含图标、颜色、允许工具等元数据。即使源文件没有 `config.json`，也会从 SKILL.md frontmatter 提取信息并生成完整的配置
+- `config.json` 中的 `allowedTools` 会自动映射外部工具名（如 Bash→exec_command），详见下文"平台适配"
+- Skill ID 只能使用小写字母、数字和连字符
+- 安装后可以提醒用户在 Agent 设置中绑定该 Skill 才能使用，或重启对话使其生效
+
+## config.json 自动生成与更新
+
+安装或更新 Skill 时，系统**始终**自动创建或覆盖 `config.json`，用户无需手动维护。
+
+### 什么时候生成
+
+- **install_url**：从 GitHub 克隆/下载后，自动生成 config.json
+- **install_path**：从本地文件夹/ZIP 导入后，自动生成 config.json
+- **update**：重新拉取并替换时，重新生成 config.json（旧版本自动备份，失败回滚）
+- **create**：从描述创建时，直接生成 config.json
+
+即使源文件只有 SKILL.md 没有任何 config.json，也会自动生成完整配置。
+
+### 字段来源
+
+所有字段的优先级：源 config.json > frontmatter > 动态推断 > 固定默认值。只有源文件和 frontmatter 都没有该字段时才触发推断。
+
+| 字段 | 来源优先级（高→低） |
+|---|---|
+| id | 用户指定 / 文件夹名 |
+| name | 源 config.json > frontmatter > skillId |
+| description | 源 config.json > frontmatter |
+| allowedTools | 源 config.json > frontmatter `allowed-tools`（自动映射外部工具名） |
+| icon | 源 config.json > frontmatter > 根据 name+description 关键词推断（学习→book-open, 写作→file-text, 代码→code-s-slash, 视频→video, 考试→file-list 等 14 种模式，默认 brain） |
+| color | 源 config.json > frontmatter > 根据 skillId 哈希确定性生成（12 种颜色，同一 skill 多次安装颜色不变） |
+| category | 源 config.json > frontmatter > 根据 name+description 关键词推断（学习/写作/开发/媒体/分析/科学/工具/研究，默认"通用"） |
+| author | 源 config.json > frontmatter > 从 GitHub URL 提取 owner（如 github.com/Kulaxyz/repo → Kulaxyz） |
+| version | 源 config.json > frontmatter > `1.0.0` |
+| license | 源 config.json > frontmatter > 空 |
+| outputTypes | 源 config.json > frontmatter > 根据 description+正文关键词推断（Markdown/HTML/DOCX/PPTX/XLSX/PDF/TXT，默认 Markdown） |
+| createdAt | 源 > 当前日期 |
+| updatedAt | 始终为当前日期 |
+| source | 固定 `custom`（内置为 `platform`） |
+
+### 关键行为
+
+- frontmatter 的 `allowed-tools` 会被自动映射为 Reviva 工具 ID 并写入 config.json 的 allowedTools
+- 更新时 config.json 被重新生成覆盖；如果源文件没有 config.json，之前手动编辑的字段会丢失
+- 内置 Skill 的 config.json 在应用启动时按版本刷新：工作区副本仍为 source=platform 时，仅当内置 version 变更或副本 spec 校验无效才覆盖刷新；被用户改为自定义（source 非 platform）的不刷新，保护用户修改
+- config.json 和 DB 记录同步更新，确保 Agent 绑定工具时读到正确的 allowedTools
+- icon、color、category、author、outputTypes 会根据 skill 的 name、description 和 GitHub URL 动态推断，不是固定默认值。例如学习类 skill 自动获得书本图标，视频类获得视频图标；color 基于 skillId 哈希生成，同一 skill 始终相同
 
 ## 工作流程
 
-### 步骤1: 跨平台环境检测
-```bash
-# 检测操作系统类型
-detect_os() {
-    case "$(uname -s)" in
-        Linux*)     OS="Linux";;
-        Darwin*)    OS="macOS";;
-        CYGWIN*|MINGW*|MSYS*) OS="Windows";;
-        *)          OS="Unknown";;
-    esac
-    echo "操作系统: $OS"
-}
+### 1. 用户想了解有哪些 Skill
 
-# 检测架构
-detect_arch() {
-    case "$(uname -m)" in
-        x86_64*)  ARCH="x64";;
-        i686*)    ARCH="x86";;
-        arm*)     ARCH="arm";;
-        aarch64*) ARCH="arm64";;
-        *)        ARCH="unknown";;
-    esac
-    echo "架构: $ARCH"
-}
+调用 `skill_install({ action: "list" })`，返回已安装的 Skills 和可用的内置 Skills。
 
-# 检测Shell环境
-detect_shell() {
-    if [ -n "$ZSH_VERSION" ]; then
-        SHELL_TYPE="zsh"
-    elif [ -n "$BASH_VERSION" ]; then
-        SHELL_TYPE="bash"
-    elif [ -n "$PSModulePath" ]; then
-        SHELL_TYPE="powershell"
-    elif command -v cmd &> /dev/null; then
-        SHELL_TYPE="cmd"
-    else
-        SHELL_TYPE="unknown"
-    fi
-    echo "Shell: $SHELL_TYPE"
-}
+### 2. 用户提供 GitHub URL 安装
+
+当用户提供类似 `https://github.com/xxx/yyy` 的链接时：
+
+```
+skill_install({
+  action: "install_url",
+  url: "https://github.com/xxx/yyy",
+  skillId: "可选的自定义ID"
+})
 ```
 
-### 步骤2: 跨平台命令适配
+工具会自动 clone 仓库并导入。如果仓库根目录没有 SKILL.md，会扫描子目录安装多个 Skill。如果该 skillId 已安装，install_url 会返回 conflict 拒绝覆盖；要替换已安装的 Skill 请用 action: "update"。
 
-#### Git安装命令
-```bash
-# 跨平台Git安装
-install_git() {
-    case "$OS" in
-        "Linux")
-            if command -v apt &> /dev/null; then
-                sudo apt update && sudo apt install -y git
-            elif command -v yum &> /dev/null; then
-                sudo yum install -y git
-            elif command -v dnf &> /dev/null; then
-                sudo dnf install -y git
-            elif command -v pacman &> /dev/null; then
-                sudo pacman -Sy git
-            fi
-            ;;
-        "macOS")
-            if command -v brew &> /dev/null; then
-                brew install git
-            else
-                echo "请安装Homebrew后重试"
-                exit 1
-            fi
-            ;;
-        "Windows")
-            if command -v choco &> /dev/null; then
-                choco install git -y
-            elif command -v winget &> /dev/null; then
-                winget install Git.Git
-            elif command -v scoop &> /dev/null; then
-                scoop install git
-            else
-                echo "请安装Chocolatey、winget或Scoop后重试"
-                exit 1
-            fi
-            ;;
-    esac
-}
+用户也可只给 `作者/仓库名`（如 `Kulaxyz/rovo`），工具会自动补全为 `https://github.com/作者/仓库名`。
+
+如果 clone 失败，分析错误原因：
+- 网络问题：提示用户检查网络或使用代理
+- git 未安装：工具会自动降级为下载 GitHub ZIP 包并解压，无需 git
+- 仓库不存在：提示用户检查 URL
+- 直连 GitHub 失败：工具会自动尝试 gh-proxy.com、mirror.ghproxy.com 等加速镜像
+- 所有方式都失败：提示用户手动下载 ZIP，然后用 install_path 安装
+
+### 3. 用户提供了本地文件夹或 ZIP 路径
+
+```
+skill_install({
+  action: "install_path",
+  sourcePath: "用户提供的绝对路径",
+  skillId: "可选的自定义ID"
+})
 ```
 
-#### 路径处理函数
-```bash
-# 跨平台路径处理
-normalize_path() {
-    local path="$1"
-    case "$OS" in
-        "Windows")
-            # 转换为Windows路径
-            echo "$path" | sed 's|/|\\|g'
-            ;;
-        *)
-            # 保持Unix路径
-            echo "$path"
-            ;;
-    esac
-}
+如果下载github仓库失败可以提示用户手动下载skill，支持文件夹和 ZIP 格式。导入前会自动检测 Skill 结构。同样，已存在的 skillId 会返回 conflict，需要替换请用 update。
 
-# 获取主目录
-get_home_dir() {
-    case "$OS" in
-        "Windows")
-            echo "$USERPROFILE"
-            ;;
-        *)
-            echo "$HOME"
-            ;;
-    esac
-}
+### 4. 用户描述要创建的 Skill
+
+从用户的描述中提取信息，生成 SKILL.md 内容：
+
+```
+skill_install({
+  action: "create",
+  skillId: "my-skill",
+  name: "显示名称",
+  description: "触发描述，用于匹配用户请求",
+  promptContent: "SKILL.md 的正文内容（不含 frontmatter，系统会自动生成）",
+  allowedTools: ["exec_command"],
+  icon: "ri-brain-line",
+  color: "#6C8AFF"
+})
 ```
 
-### 步骤3: 智能安装策略
+创建时根据用户需求设计 SKILL.md 正文：
+- 清晰的工作流程步骤
+- 具体的工具调用示例
+- 触发条件和使用场景
 
-#### 策略1: Git克隆（跨平台）
-```bash
-git_clone_install() {
-    local repo_url="$1"
-    local target_dir="$2"
-  
-    # 检查Git是否可用
-    if ! command -v git &> /dev/null; then
-        echo "Git未安装，正在尝试安装..."
-        install_git
-    fi
-  
-    # 根据操作系统选择克隆命令
-    case "$OS" in
-        "Windows")
-            # Windows下处理路径分隔符
-            local win_target=$(normalize_path "$target_dir")
-            git clone "$repo_url" "$win_target"
-            ;;
-        *)
-            git clone "$repo_url" "$target_dir"
-            ;;
-    esac
-}
+### 5. 验证已安装的 Skill
+
+```
+skill_install({ action: "validate", skillId: "skill-id" })
 ```
 
-#### 策略2: 下载解压（跨平台）
-```bash
-download_install() {
-    local url="$1"
-    local target_dir="$2"
-    local filename=$(basename "$url")
-  
-    # 根据操作系统选择下载工具
-    if command -v curl &> /dev/null; then
-        curl -L "$url" -o "$filename"
-    elif command -v wget &> /dev/null; then
-        wget "$url" -O "$filename"
-    elif [ "$OS" = "Windows" ]; then
-        # Windows PowerShell下载
-        powershell -Command "Invoke-WebRequest -Uri '$url' -OutFile '$filename'"
-    else
-        echo "未找到下载工具，请安装curl或wget"
-        exit 1
-    fi
-  
-    # 解压文件
-    if command -v unzip &> /dev/null && [[ "$filename" == *.zip ]]; then
-        unzip "$filename" -d "$target_dir"
-    elif command -v tar &> /dev/null && [[ "$filename" == *.tar* ]]; then
-        tar -xvf "$filename" -C "$target_dir"
-    elif [ "$OS" = "Windows" ]; then
-        # Windows PowerShell解压
-        powershell -Command "Expand-Archive -Path '$filename' -DestinationPath '$target_dir'"
-    fi
-  
-    # 清理临时文件
-    rm -f "$filename"
-}
+### 6. 查看 Skill 内容
+
+```
+skill_install({ action: "info", skillId: "skill-id" })
 ```
 
-### 步骤4: 智能目录选择
+### 7. 删除 Skill
 
-#### 跨平台Skills目录
-```bash
-get_skills_dir() {
-    local base_dir=""
-  
-    case "$OS" in
-        "Windows")
-            # Windows: 使用用户目录
-            if [ -n "$USERPROFILE" ]; then
-                base_dir="$USERPROFILE\\.claude\\skills"
-            else
-                base_dir="$HOME\\.claude\\skills"
-            fi
-            ;;
-        "macOS")
-            # macOS: 使用用户目录
-            base_dir="$HOME/.claude/skills"
-            ;;
-        "Linux")
-            # Linux: 使用用户目录
-            base_dir="$HOME/.claude/skills"
-            ;;
-    esac
-  
-    # 确保目录存在
-    mkdir -p "$base_dir"
-    echo "$base_dir"
-}
-
-# 项目级Skills目录
-get_project_skills_dir() {
-    local project_dir=""
-  
-    # 检查是否在Git项目中
-    if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-        project_dir=$(git rev-parse --show-toplevel)
-        project_dir="$project_dir/.claude/skills"
-    else
-        # 非Git项目，使用当前目录
-        project_dir="$(pwd)/.claude/skills"
-    fi
-  
-    # 确保目录存在
-    mkdir -p "$project_dir"
-    echo "$project_dir"
-}
+```
+skill_install({ action: "uninstall", skillId: "skill-id" })
 ```
 
-### 步骤5: 权限处理
+内置 Skill 不能删除。
 
-#### 跨平台权限检查
-```bash
-check_permissions() {
-    local dir="$1"
-  
-    # 检查写入权限
-    if [ ! -w "$dir" ]; then
-        echo "⚠️  权限不足: $dir"
-        echo "💡 解决方案:"
-      
-        case "$OS" in
-            "Windows")
-                echo "  1. 以管理员身份运行"
-                echo "  2. 更改目录权限"
-                echo "  3. 选择其他安装位置"
-                ;;
-            "macOS"|"Linux")
-                echo "  1. 使用sudo执行"
-                echo "  2. 更改目录权限: chmod 755 $dir"
-                echo "  3. 选择其他安装位置"
-                ;;
-        esac
-      
-        return 1
-    fi
-  
-    return 0
-}
+### 8. 更新已安装的 Skill
+
+从 GitHub 重新拉取并替换已安装的 Skill：
+
+```
+skill_install({
+  action: "update",
+  skillId: "要更新的skill-id",
+  url: "https://github.com/xxx/yyy"
+})
 ```
 
-### 步骤6: 安装验证
+更新时会自动备份旧版本，如果失败会自动回滚。内置 Skill 不能通过此方式更新（内置 Skill 在应用启动时按版本自动刷新，无需手动 update）。
 
-#### 跨平台验证
-```bash
-verify_installation() {
-    local skill_dir="$1"
-    local skill_name="$2"
-  
-    # 检查SKILL.md是否存在
-    if [ -f "$skill_dir/$skill_name/SKILL.md" ]; then
-        echo "✅ 安装成功: $skill_name"
-        echo "📁 安装位置: $skill_dir/$skill_name"
-      
-        # 显示文件信息
-        echo "📋 文件列表:"
-        ls -la "$skill_dir/$skill_name/" 2>/dev/null || dir "$skill_dir\\$skill_name" 2>/dev/null
-      
-        return 0
-    else
-        echo "❌ 安装失败: 未找到SKILL.md"
-        return 1
-    fi
-}
-```
+如果用户不确定 URL，可以先用 action: "list" 查看已安装的 Skill，或请用户提供仓库地址。
 
-## 完整工作流程
+**install_url 是一站式操作**：单次调用自动完成 clone/下载、解压、config.json 生成、工具映射、验证、DB 同步和适配扫描。返回结果已包含 spec（验证状态）和 adaptation（适配报告），无需再单独调用 validate 或 info。仅当安装失败或用户要求查看内容时才需要额外调用。
 
-### 主安装函数
-```bash
-install_skill() {
-    local input="$1"
-    local install_type="${2:-auto}"  # auto, global, project
-  
-    # 步骤1: 环境检测
-    detect_os
-    detect_arch
-    detect_shell
-  
-    # 步骤2: 解析输入
-    local skill_name=""
-    local repo_url=""
-    local local_path=""
-  
-    if [[ "$input" == http* ]]; then
-        repo_url="$input"
-        skill_name=$(basename "$repo_url" .git)
-    elif [[ "$input" == /* || "$input" == ./* || "$input" == ../* ]]; then
-        local_path="$input"
-        skill_name=$(basename "$local_path")
-    else
-        skill_name="$input"
-        # 搜索GitHub
-        repo_url="https://github.com/anthropics/skills.git"
-    fi
-  
-    # 步骤3: 选择安装目录
-    local target_dir=""
-    case "$install_type" in
-        "global")
-            target_dir=$(get_skills_dir)
-            ;;
-        "project")
-            target_dir=$(get_project_skills_dir)
-            ;;
-        "auto")
-            # 自动检测：优先项目级，其次全局
-            if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-                target_dir=$(get_project_skills_dir)
-                echo "📁 安装到项目目录: $target_dir"
-            else
-                target_dir=$(get_skills_dir)
-                echo "📁 安装到全局目录: $target_dir"
-            fi
-            ;;
-    esac
-  
-    # 步骤4: 检查权限
-    if ! check_permissions "$target_dir"; then
-        echo "❌ 权限检查失败"
-        return 1
-    fi
-  
-    # 步骤5: 执行安装
-    echo "📦 开始安装: $skill_name"
-  
-    if [[ -n "$local_path" ]]; then
-        # 本地文件安装
-        if [ -d "$local_path" ]; then
-            cp -r "$local_path" "$target_dir/$skill_name"
-        elif [ -f "$local_path" ]; then
-            mkdir -p "$target_dir/$skill_name"
-            cp "$local_path" "$target_dir/$skill_name/SKILL.md"
-        fi
-    elif [[ -n "$repo_url" ]]; then
-        # Git克隆安装
-        git_clone_install "$repo_url" "$target_dir/$skill_name"
-    fi
-  
-    # 步骤6: 验证安装
-    verify_installation "$target_dir" "$skill_name"
-  
-    # 步骤7: 显示使用说明
-    echo ""
-    echo "🎉 安装完成！"
-    echo "💡 使用方法:"
-    echo "   1. 重启Claude Code或相关工具"
-    echo "   2. 在对话中触发: $skill_name"
-    echo "   3. 或手动加载: /skills $skill_name"
-}
-```
+## 安装后提示
 
-## 用户输入处理示例
+每次安装或创建 Skill 后，告知用户：
+1. Skill 已安装的位置
+2. 建议关闭并重新打开 Reviva，使新 Skill 完全生效
+3. 也可以在 Agent 设置中手动绑定该 Skill
+4. 如果返回了 adaptation 报告且 needsAttention=true，告知用户该 Skill 可能需要适配（见下文）
+5. 告知用户 config.json 已自动生成（含映射后的工具列表），无需手动创建
 
-### 示例1: Windows用户
-```powershell
-# 用户输入: 帮我安装代码审查skill
-# 输出:
-# 🔍 检测操作系统: Windows
-# 📁 安装到全局目录: C:\Users\username\.claude\skills
-# 📦 开始安装: code-review
-# git clone https://github.com/xxx/code-review.git "C:\Users\username\.claude\skills\code-review"
-# ✅ 安装成功: code-review
-```
+## 注意事项
 
-### 示例2: macOS用户
-```bash
-# 用户输入: 安装这个skill: https://github.com/anthropics/skills.git
-# 输出:
-# 🔍 检测操作系统: macOS
-# 📁 安装到全局目录: /Users/username/.claude/skills
-# 📦 开始安装: skills
-# git clone https://github.com/anthropics/skills.git /Users/username/.claude/skills/skills
-# ✅ 安装成功: skills
-```
+- 不能覆盖内置 Skill（source 为 platform 的）
+- 安装前检查是否已存在同名 Skill，避免冲突
+- 如果用户提供的 URL 不是 GitHub，尝试用 install_path 处理
+- 创建 Skill 时确保 description 清晰，以便正确触发
+- create 不执行适配扫描（自建 Skill 无需跨平台适配）；install_url/install_path/update 才返回 adaptation 报告
 
-### 示例3: Linux用户（无Git）
-```bash
-# 用户输入: 我想安装PDF处理skill
-# 输出:
-# 🔍 检测操作系统: Linux
-# ⚠️  Git未安装，正在尝试安装...
-# sudo apt update && sudo apt install -y git
-# 📁 安装到全局目录: /home/username/.claude/skills
-# 📦 开始安装: pdf-processor
-# git clone https://github.com/xxx/pdf-processor.git /home/username/.claude/skills/pdf-processor
-# ✅ 安装成功: pdf-processor
-```
+## 平台适配
 
-### 示例4: 本地文件迁移
-```bash
-# 用户输入: 我下载了skill，路径是 /tmp/my-skill
-# 输出:
-# 🔍 检测操作系统: macOS
-# 📁 安装到全局目录: /Users/username/.claude/skills
-# 📦 开始安装: my-skill
-# cp -r /tmp/my-skill /Users/username/.claude/skills/my-skill
-# ✅ 安装成功: my-skill
-```
+从 GitHub、Claude、Codex 等外部来源安装的 Skill，其 SKILL.md 可能引用其他平台的工具名、路径或依赖。安装时 `skill_install` 会自动执行适配扫描，返回 `adaptation` 报告。
 
-### 示例5: GitHub代理（Windows）
-```powershell
-# 用户输入: 安装 https://github.com/xxx/yyy.git
-# 输出:
-# 🔍 检测操作系统: Windows
-# ⚠️  无法直接访问GitHub
-# 🔄 尝试代理: https://gh-proxy.com
-# git clone https://gh-proxy.com/https://github.com/xxx/yyy.git "C:\Users\username\.claude\skills\yyy"
-# ✅ 安装成功: yyy
-```
+### 自动工具映射
 
-## 高级功能
+安装时自动将以下外部工具名映射为 Reviva 工具 ID（写入 config.json 的 allowedTools）：
 
-### 1. 自动Git安装
-```bash
-# 如果Git未安装，自动安装
-auto_install_git() {
-    if ! command -v git &> /dev/null; then
-        echo "⚠️  Git未安装"
-        echo "🔧 正在尝试自动安装..."
-      
-        case "$OS" in
-            "Linux")
-                if command -v apt &> /dev/null; then
-                    sudo apt update && sudo apt install -y git
-                elif command -v yum &> /dev/null; then
-                    sudo yum install -y git
-                fi
-                ;;
-            "macOS")
-                if command -v brew &> /dev/null; then
-                    brew install git
-                else
-                    echo "❌ 请先安装Homebrew: https://brew.sh/"
-                    exit 1
-                fi
-                ;;
-            "Windows")
-                if command -v choco &> /dev/null; then
-                    choco install git -y
-                elif command -v winget &> /dev/null; then
-                    winget install Git.Git
-                else
-                    echo "❌ 请安装Chocolatey或winget"
-                    exit 1
-                fi
-                ;;
-        esac
-      
-        # 验证安装
-        if command -v git &> /dev/null; then
-            echo "✅ Git安装成功"
-        else
-            echo "❌ Git安装失败"
-            exit 1
-        fi
-    fi
-}
-```
+| 外部工具名 | Reviva 工具 ID |
+|---|---|
+| Bash, Shell, Execute, Command, Terminal | exec_command |
+| Read, read_file | file_read |
+| Write, write_file, Edit | file_write |
+| PDF, DOCX, XLSX, PPTX（读取） | document_read |
+| Vision, Image, Screenshot | vision_analyze |
+| KB, Knowledge | kb_search |
+| Exa | mcp:exa |
+| Firecrawl | mcp:firecrawl-mcp-server |
+| Bing, web_search | web_search_bing |
+| Tavily | web_search_tavily |
 
-### 2. 代理自动选择
-```bash
-# 自动选择可用代理
-select_proxy() {
-    local proxies=(
-        "https://gh-proxy.com"
-        "https://mirror.ghproxy.com"
-        "https://gitclone.com"
-        "https://bgithub.xyz"
-    )
-  
-    for proxy in "${proxies[@]}"; do
-        if curl -s --connect-timeout 3 "$proxy" > /dev/null 2>&1; then
-            echo "$proxy"
-            return 0
-        fi
-    done
-  
-    return 1
-}
-```
+> 上表为主要别名，完整映射还包含 subprocess、readfile、create_file、save_file、knowledge_base、websearch、search 等。未识别的工具名会保留原值并进入下文 unmappedTools。
 
-### 3. 路径标准化
-```bash
-# 跨平台路径标准化
-standardize_path() {
-    local path="$1"
-  
-    case "$OS" in
-        "Windows")
-            # 转换为Windows路径
-            echo "$path" | sed 's|/|\\|g'
-            ;;
-        *)
-            # 保持Unix路径
-            echo "$path"
-            ;;
-    esac
-}
-```
+### adaptation 报告字段
 
-## 错误处理
+- `mappedTools`: 已自动映射的工具（{ from, to }）
+- `unmappedTools`: 无法识别的工具名，需要你或用户手动确认对应关系
+- `warnings`: SKILL.md 正文中检测到的平台特定模式（系统路径、localhost、pip/npm install、日期占位符等）
+- `needsAttention`: true 表示存在未映射工具或警告，需要进一步处理
 
-### 跨平台错误处理
-```bash
-handle_error() {
-    local error_type="$1"
-    local context="$2"
-  
-    case "$error_type" in
-        "permission")
-            echo "❌ 权限不足"
-            echo "💡 解决方案:"
-            case "$OS" in
-                "Windows")
-                    echo "  1. 以管理员身份运行"
-                    echo "  2. 更改目录权限"
-                    ;;
-                "macOS"|"Linux")
-                    echo "  1. 使用sudo: sudo install-skill"
-                    echo "  2. 更改权限: chmod 755 $context"
-                    ;;
-            esac
-            ;;
-        "network")
-            echo "❌ 网络连接失败"
-            echo "💡 解决方案:"
-            echo "  1. 检查网络连接"
-            echo "  2. 尝试使用VPN/代理"
-            echo "  3. 使用离线安装方式"
-            ;;
-        "git")
-            echo "❌ Git命令失败"
-            echo "💡 解决方案:"
-            case "$OS" in
-                "Windows")
-                    echo "  1. 安装Git: choco install git -y"
-                    echo "  2. 或: winget install Git.Git"
-                    ;;
-                "macOS")
-                    echo "  1. 安装Git: brew install git"
-                    ;;
-                "Linux")
-                    echo "  1. 安装Git: sudo apt install git"
-                    ;;
-            esac
-            ;;
-    esac
-}
-```
+### 如何处理适配问题
 
-## 使用示例
+1. `unmappedTools` 非空：告知用户这些工具名无法自动映射，询问是否知道对应的 Reviva 工具，或建议忽略
+2. `warnings` 含系统路径（/home/、~/.claude/、C:\\Users\\）：告知用户该 Skill 引用了其他平台路径，可能需要手动修改 SKILL.md 中的路径为 Reviva 虚拟路径
+3. `warnings` 含 pip/npm install：告知用户该 Skill 依赖自动安装，Reviva 不允许自动安装，需要用户手动准备环境
+4. `warnings` 含 localhost：告知用户该 Skill 引用了本地服务，可能无法在 Reviva 中直接使用
+5. 复杂适配：可读取同目录下的 `SKILL_ADAPTATION_WORKFLOW.md`（如果存在）了解完整适配工作流
 
-### 完整跨平台安装流程
-```bash
-#!/bin/bash
-# 跨平台安装入口脚本
+### Reviva 关键路径规则
 
-# 检测操作系统
-detect_os
-
-# 调用安装函数
-install_skill "$1" "${2:-auto}"
-```
-
-## 相关资源
-
-1. **跨平台开发最佳实践**[1][3][8]:
-   - 使用相对路径
-   - 避免硬编码平台特定代码
-   - 使用条件编译
-   - 利用容器化技术
-
-2. **包管理器**:
-   - Windows: Chocolatey, winget, Scoop
-   - macOS: Homebrew
-   - Linux: apt, yum, dnf, pacman
-
-3. **Git代理服务**:
-   - gh-proxy.com
-   - mirror.ghproxy.com
-   - gitclone.com
-   - bgithub.xyz
-
+- 最终文件输出：`/agents/{当前Agent英文名}/outputs/{系统日期}/文件名.ext`
+- 临时文件：`/tmp/{当前Agent英文名}/{系统日期}/中间文件.ext`
+- Skill 目录：`/skills/{skillId}/`（只读）
+- 不要写系统 temp、Skill 目录或固定绝对路径作为最终输出

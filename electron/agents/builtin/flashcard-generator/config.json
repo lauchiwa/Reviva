@@ -19,8 +19,17 @@
     "fileRename": false,
     "execCommand": false
   },
-  "tools": ["mcp:exa", "file_read", "document_read", "media_read", "vision_analyze", "kb_search"],
-  "skills": ["flashcard-generator"],
+  "tools": [
+    "mcp:exa",
+    "file_read",
+    "document_read",
+    "media_read",
+    "vision_analyze",
+    "kb_search"
+  ],
+  "skills": [
+    "flashcard-generator"
+  ],
   "sub_agents": [],
   "max_iterations": 1,
   "retrieval_iterations": 3,
@@ -30,7 +39,7 @@
   "max_tokens": 8192,
   "thinking_mode": "off",
   "thinking_intensity": "medium",
-  "hard_timeout_ms": 180000,
+  "hard_timeout_ms": 3600000,
   "required_tools": [],
   "prompt_file": "orchestrator.md",
   "subagent_dir": "subagents",
